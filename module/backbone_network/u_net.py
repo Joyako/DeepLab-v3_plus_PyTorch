@@ -22,16 +22,16 @@ class Encoder(nn.Module):
         self.backbone.layer1.stride = 2
 
     def forward(self, x):
-        # stride = 2
+        # stride = 1
         h1 = self.layer0(x)
-        # stride = 4
+        # stride = 2
         h2 = self.backbone.maxpool(h1)
         h2 = self.backbone.layer1(h2)
-        # stride = 8
+        # stride = 4
         h3 = self.backbone.layer2(h2)
-        # stride = 16
+        # stride = 8
         h4 = self.backbone.layer3(h3)
-        # stride = 32
+        # stride = 16
         h5 = self.backbone.layer4(h4)
 
         return h1, h2, h3, h4, h5
