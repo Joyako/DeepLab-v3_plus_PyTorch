@@ -1,10 +1,13 @@
 import torch
 import torch.nn as nn
 from torchvision.models.resnet import resnet18, resnet34, \
-    resnet50, resnet101, resnet152, Bottleneck, BasicBlock
+    resnet50, resnet101, resnet152
 
 
 class Encoder(nn.Module):
+    """
+    Taking ResNet as backbone.
+    """
     def __init__(self, backbone):
         super().__init__()
         self.backbone = backbone
@@ -16,13 +19,19 @@ class Encoder(nn.Module):
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
         )
+        self.backbone.layer1.stride = 2
 
     def forward(self, x):
+        # stride = 2
         h1 = self.layer0(x)
+        # stride = 4
         h2 = self.backbone.maxpool(h1)
         h2 = self.backbone.layer1(h2)
+        # stride = 8
         h3 = self.backbone.layer2(h2)
+        # stride = 16
         h4 = self.backbone.layer3(h3)
+        # stride = 32
         h5 = self.backbone.layer4(h4)
 
         return h1, h2, h3, h4, h5
