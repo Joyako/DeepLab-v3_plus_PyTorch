@@ -27,10 +27,11 @@ def train(net, data_loader, optimizer, criterion, device, epoch, print_freq=40):
         end_time = time.time() - start_time
         lr = optimizer.param_groups[0]['lr']
         if i_batch % print_freq == 0:
-            print("Iter: {}/{} Loss: {:.4f} LR: {:.8f} BatchTime: {:.4f}".format(i_batch, epoch,
-                                                                                 loss.item(),
-                                                                                 lr,
-                                                                                 end_time))
+            print("Epoch: {} Iter: {}/{} Loss: {:.4f} LR: {:.8f} BatchTime: {:.4f}".format(epoch,
+                                                                                           i_batch, len(data_loader),
+                                                                                           loss.item(),
+                                                                                           lr,
+                                                                                           end_time))
 
 
 def build_train(cfg, data_loader,
@@ -65,4 +66,5 @@ def build_train(cfg, data_loader,
     for epoch in range(1, cfg['epoch'] + 1):
         train(net, data_loader, optimizer, criterion, device, epoch, cfg['print_freq'])
         lr_scheduler.step()
-        torch.save(net.state_dict(), cfg['save_path'] + '/Lane_%s.pth' % epoch)
+        if epoch > 50 and epoch % 10 == 0:
+            torch.save(net.state_dict(), cfg['save_path'] + '/Lane_%s.pth' % epoch)
