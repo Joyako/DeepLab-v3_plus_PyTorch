@@ -1,6 +1,18 @@
 import torch.nn as nn
 import torch
-import numpy as np
+
+
+class BasicConv(nn.Module):
+    def __init__(self, inplanes, planes, kernel_size, stride=1, padding=1):
+        super().__init__()
+        self.conv = nn.Conv2d(inplanes, planes, kernel_size=kernel_size,
+                              stride=stride, padding=padding, bias=False)
+        self.bn = nn.BatchNorm2d(planes)
+        self.relu = nn.ReLU(inplace=True)
+
+    def forward(self, x):
+
+        return self.relu(self.bn(self.conv(x)))
 
 
 # https://github.com/shelhamer/fcn.berkeleyvision.org/blob/master/surgery.py
@@ -21,67 +33,51 @@ def get_upsampling_weight(in_channels, out_channels, kernel_size):
 
 
 class FCN32s(nn.Module):
+    def __init__(self, num_classes=21):
+        super().__init__()
+        # stride = 8
+        self.stage1 = nn.Sequential(
+            BasicConv(3, 64, 3, padding=100),
+            BasicConv(64, 64, 3),
+            nn.MaxPool2d(2, stride=2, ceil_mode=True),
+            BasicConv(64, 128, 3),
+            BasicConv(128, 128, 3),
+            nn.MaxPool2d(2, stride=2, ceil_mode=True),
+            BasicConv(128, 256, 3),
+            BasicConv(256, 256, 3),
+            BasicConv(256, 256, 3),
+            nn.MaxPool2d(2, stride=2, ceil_mode=True),
+        )
 
-    def __init__(self, n_class=21):
-        super(FCN32s, self).__init__()
-        # conv1
-        self.conv1_1 = nn.Conv2d(3, 64, 3, padding=100)
-        self.relu1_1 = nn.ReLU(inplace=True)
-        self.conv1_2 = nn.Conv2d(64, 64, 3, padding=1)
-        self.relu1_2 = nn.ReLU(inplace=True)
-        self.pool1 = nn.MaxPool2d(2, stride=2, ceil_mode=True)  # 1/2
+        # stride = 16
+        self.stage2 = nn.Sequential(
+            BasicConv(256, 512, 3),
+            BasicConv(512, 512, 3),
+            BasicConv(512, 512, 3),
+            nn.MaxPool2d(2, stride=2, ceil_mode=True),
+        )
 
-        # conv2
-        self.conv2_1 = nn.Conv2d(64, 128, 3, padding=1)
-        self.relu2_1 = nn.ReLU(inplace=True)
-        self.conv2_2 = nn.Conv2d(128, 128, 3, padding=1)
-        self.relu2_2 = nn.ReLU(inplace=True)
-        self.pool2 = nn.MaxPool2d(2, stride=2, ceil_mode=True)  # 1/4
+        # stride = 32
+        self.stage3 = nn.Sequential(
+            BasicConv(512, 512, 3),
+            BasicConv(512, 512, 3),
+            BasicConv(512, 512, 3),
+            nn.MaxPool2d(2, stride=2, ceil_mode=True),
+        )
 
-        # conv3
-        self.conv3_1 = nn.Conv2d(128, 256, 3, padding=1)
-        self.relu3_1 = nn.ReLU(inplace=True)
-        self.conv3_2 = nn.Conv2d(256, 256, 3, padding=1)
-        self.relu3_2 = nn.ReLU(inplace=True)
-        self.conv3_3 = nn.Conv2d(256, 256, 3, padding=1)
-        self.relu3_3 = nn.ReLU(inplace=True)
-        self.pool3 = nn.MaxPool2d(2, stride=2, ceil_mode=True)  # 1/8
+        self.classifer = nn.Sequential(
+            BasicConv(512, 4096, 7, padding=0),
+            nn.Dropout2d(),
+            BasicConv(4096, 4096, 1, padding=0),
+            nn.Dropout2d(),
+            nn.Conv2d(4096, num_classes, 1, bias=False),
+        )
 
-        # conv4
-        self.conv4_1 = nn.Conv2d(256, 512, 3, padding=1)
-        self.relu4_1 = nn.ReLU(inplace=True)
-        self.conv4_2 = nn.Conv2d(512, 512, 3, padding=1)
-        self.relu4_2 = nn.ReLU(inplace=True)
-        self.conv4_3 = nn.Conv2d(512, 512, 3, padding=1)
-        self.relu4_3 = nn.ReLU(inplace=True)
-        self.pool4 = nn.MaxPool2d(2, stride=2, ceil_mode=True)  # 1/16
+        self.upsample = nn.ConvTranspose2d(num_classes, num_classes, 64, stride=32, bias=False)
 
-        # conv5
-        self.conv5_1 = nn.Conv2d(512, 512, 3, padding=1)
-        self.relu5_1 = nn.ReLU(inplace=True)
-        self.conv5_2 = nn.Conv2d(512, 512, 3, padding=1)
-        self.relu5_2 = nn.ReLU(inplace=True)
-        self.conv5_3 = nn.Conv2d(512, 512, 3, padding=1)
-        self.relu5_3 = nn.ReLU(inplace=True)
-        self.pool5 = nn.MaxPool2d(2, stride=2, ceil_mode=True)  # 1/32
+        self._init_weights()
 
-        # fc6
-        self.fc6 = nn.Conv2d(512, 4096, 7)
-        self.relu6 = nn.ReLU(inplace=True)
-        self.drop6 = nn.Dropout2d()
-
-        # fc7
-        self.fc7 = nn.Conv2d(4096, 4096, 1)
-        self.relu7 = nn.ReLU(inplace=True)
-        self.drop7 = nn.Dropout2d()
-
-        self.score_fr = nn.Conv2d(4096, n_class, 1)
-        self.upscore = nn.ConvTranspose2d(n_class, n_class, 64, stride=32,
-                                          bias=False)
-
-        self._initialize_weights()
-
-    def _initialize_weights(self):
+    def _init_weights(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 m.weight.data.zero_()
@@ -94,109 +90,68 @@ class FCN32s(nn.Module):
                 m.weight.data.copy_(initial_weight)
 
     def forward(self, x):
-        h = x
-        h = self.relu1_1(self.conv1_1(h))
-        h = self.relu1_2(self.conv1_2(h))
-        h = self.pool1(h)
+        _, _, H, W = x.size()
+        x = self.stage1(x)
+        x = self.stage2(x)
+        x = self.stage3(x)
+        x = self.classifer(x)
 
-        h = self.relu2_1(self.conv2_1(h))
-        h = self.relu2_2(self.conv2_2(h))
-        h = self.pool2(h)
+        # skip-connect: stride = 1
+        x = self.upsample(x)
+        x = x[:, :, 19:19 + H, 19:19 + W].contiguous()
 
-        h = self.relu3_1(self.conv3_1(h))
-        h = self.relu3_2(self.conv3_2(h))
-        h = self.relu3_3(self.conv3_3(h))
-        h = self.pool3(h)
-
-        h = self.relu4_1(self.conv4_1(h))
-        h = self.relu4_2(self.conv4_2(h))
-        h = self.relu4_3(self.conv4_3(h))
-        h = self.pool4(h)
-
-        h = self.relu5_1(self.conv5_1(h))
-        h = self.relu5_2(self.conv5_2(h))
-        h = self.relu5_3(self.conv5_3(h))
-        h = self.pool5(h)
-
-        h = self.relu6(self.fc6(h))
-        h = self.drop6(h)
-
-        h = self.relu7(self.fc7(h))
-        h = self.drop7(h)
-
-        h = self.score_fr(h)
-
-        h = self.upscore(h)
-        h = h[:, :, 19:19 + x.size()[2], 19:19 + x.size()[3]].contiguous()
-
-        return h
+        return x
 
 
 class FCN16s(nn.Module):
-    def __init__(self, n_class=21):
-        super(FCN16s, self).__init__()
-        # conv1
-        self.conv1_1 = nn.Conv2d(3, 64, 3, padding=100)
-        self.relu1_1 = nn.ReLU(inplace=True)
-        self.conv1_2 = nn.Conv2d(64, 64, 3, padding=1)
-        self.relu1_2 = nn.ReLU(inplace=True)
-        self.pool1 = nn.MaxPool2d(2, stride=2, ceil_mode=True)  # 1/2
+    def __init__(self, num_classes=21):
+        super().__init__()
+        # stride = 8
+        self.stage1 = nn.Sequential(
+            BasicConv(3, 64, 3, padding=100),
+            BasicConv(64, 64, 3),
+            nn.MaxPool2d(2, stride=2, ceil_mode=True),
+            BasicConv(64, 128, 3),
+            BasicConv(128, 128, 3),
+            nn.MaxPool2d(2, stride=2, ceil_mode=True),
+            BasicConv(128, 256, 3),
+            BasicConv(256, 256, 3),
+            BasicConv(256, 256, 3),
+            nn.MaxPool2d(2, stride=2, ceil_mode=True),
+        )
 
-        # conv2
-        self.conv2_1 = nn.Conv2d(64, 128, 3, padding=1)
-        self.relu2_1 = nn.ReLU(inplace=True)
-        self.conv2_2 = nn.Conv2d(128, 128, 3, padding=1)
-        self.relu2_2 = nn.ReLU(inplace=True)
-        self.pool2 = nn.MaxPool2d(2, stride=2, ceil_mode=True)  # 1/4
+        # stride = 16
+        self.stage2 = nn.Sequential(
+            BasicConv(256, 512, 3),
+            BasicConv(512, 512, 3),
+            BasicConv(512, 512, 3),
+            nn.MaxPool2d(2, stride=2, ceil_mode=True),
+        )
 
-        # conv3
-        self.conv3_1 = nn.Conv2d(128, 256, 3, padding=1)
-        self.relu3_1 = nn.ReLU(inplace=True)
-        self.conv3_2 = nn.Conv2d(256, 256, 3, padding=1)
-        self.relu3_2 = nn.ReLU(inplace=True)
-        self.conv3_3 = nn.Conv2d(256, 256, 3, padding=1)
-        self.relu3_3 = nn.ReLU(inplace=True)
-        self.pool3 = nn.MaxPool2d(2, stride=2, ceil_mode=True)  # 1/8
+        # stride = 32
+        self.stage3 = nn.Sequential(
+            BasicConv(512, 512, 3),
+            BasicConv(512, 512, 3),
+            BasicConv(512, 512, 3),
+            nn.MaxPool2d(2, stride=2, ceil_mode=True),
+        )
 
-        # conv4
-        self.conv4_1 = nn.Conv2d(256, 512, 3, padding=1)
-        self.relu4_1 = nn.ReLU(inplace=True)
-        self.conv4_2 = nn.Conv2d(512, 512, 3, padding=1)
-        self.relu4_2 = nn.ReLU(inplace=True)
-        self.conv4_3 = nn.Conv2d(512, 512, 3, padding=1)
-        self.relu4_3 = nn.ReLU(inplace=True)
-        self.pool4 = nn.MaxPool2d(2, stride=2, ceil_mode=True)  # 1/16
+        self.classifer = nn.Sequential(
+            BasicConv(512, 4096, 7, padding=0),
+            nn.Dropout2d(),
+            BasicConv(4096, 4096, 1, padding=0),
+            nn.Dropout2d(),
+            nn.Conv2d(4096, num_classes, 1, bias=False),
+        )
 
-        # conv5
-        self.conv5_1 = nn.Conv2d(512, 512, 3, padding=1)
-        self.relu5_1 = nn.ReLU(inplace=True)
-        self.conv5_2 = nn.Conv2d(512, 512, 3, padding=1)
-        self.relu5_2 = nn.ReLU(inplace=True)
-        self.conv5_3 = nn.Conv2d(512, 512, 3, padding=1)
-        self.relu5_3 = nn.ReLU(inplace=True)
-        self.pool5 = nn.MaxPool2d(2, stride=2, ceil_mode=True)  # 1/32
+        self.conv4 = BasicConv(512, num_classes, 1, padding=0)
 
-        # fc6
-        self.fc6 = nn.Conv2d(512, 4096, 7)
-        self.relu6 = nn.ReLU(inplace=True)
-        self.drop6 = nn.Dropout2d()
+        self.upsample4 = nn.ConvTranspose2d(num_classes, num_classes, 32, stride=16, bias=False)
+        self.upsample5 = nn.ConvTranspose2d(num_classes, num_classes, 4, stride=2, bias=False)
 
-        # fc7
-        self.fc7 = nn.Conv2d(4096, 4096, 1)
-        self.relu7 = nn.ReLU(inplace=True)
-        self.drop7 = nn.Dropout2d()
+        self._init_weights()
 
-        self.score_fr = nn.Conv2d(4096, n_class, 1)
-        self.score_pool4 = nn.Conv2d(512, n_class, 1)
-
-        self.upscore2 = nn.ConvTranspose2d(
-            n_class, n_class, 4, stride=2, bias=False)
-        self.upscore16 = nn.ConvTranspose2d(
-            n_class, n_class, 32, stride=16, bias=False)
-
-        self._initialize_weights()
-
-    def _initialize_weights(self):
+    def _init_weights(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 m.weight.data.zero_()
@@ -209,121 +164,78 @@ class FCN16s(nn.Module):
                 m.weight.data.copy_(initial_weight)
 
     def forward(self, x):
-        h = x
-        h = self.relu1_1(self.conv1_1(h))
-        h = self.relu1_2(self.conv1_2(h))
-        h = self.pool1(h)
+        _, _, H, W = x.size()
+        x = self.stage1(x)
+        x = self.stage2(x)
+        h1 = x
+        x = self.stage3(x)
+        x = self.classifer(x)
 
-        h = self.relu2_1(self.conv2_1(h))
-        h = self.relu2_2(self.conv2_2(h))
-        h = self.pool2(h)
+        # skip-connect: stride = 16
+        x = self.upsample5(x)
+        h2 = x
+        x = self.conv4(h1)
+        x = x[:, :, 5:5 + h2.size(2), 5:5 + h2.size(3)]
+        x = x + h2
 
-        h = self.relu3_1(self.conv3_1(h))
-        h = self.relu3_2(self.conv3_2(h))
-        h = self.relu3_3(self.conv3_3(h))
-        h = self.pool3(h)
+        # skip-connect: stride = 1
+        x = self.upsample4(x)
+        x = x[:, :, 27:27 + H, 27:27 + W]
 
-        h = self.relu4_1(self.conv4_1(h))
-        h = self.relu4_2(self.conv4_2(h))
-        h = self.relu4_3(self.conv4_3(h))
-        h = self.pool4(h)
-        pool4 = h  # 1/16
-
-        h = self.relu5_1(self.conv5_1(h))
-        h = self.relu5_2(self.conv5_2(h))
-        h = self.relu5_3(self.conv5_3(h))
-        h = self.pool5(h)
-
-        h = self.relu6(self.fc6(h))
-        h = self.drop6(h)
-
-        h = self.relu7(self.fc7(h))
-        h = self.drop7(h)
-
-        h = self.score_fr(h)
-        h = self.upscore2(h)
-        upscore2 = h  # 1/16
-
-        h = self.score_pool4(pool4)
-        h = h[:, :, 5:5 + upscore2.size()[2], 5:5 + upscore2.size()[3]]
-        score_pool4c = h  # 1/16
-
-        h = upscore2 + score_pool4c
-
-        h = self.upscore16(h)
-        h = h[:, :, 27:27 + x.size()[2], 27:27 + x.size()[3]].contiguous()
-
-        return h
+        return x
 
 
 class FCN8s(nn.Module):
-    def __init__(self, n_class=21):
-        super(FCN8s, self).__init__()
-        # conv1
-        self.conv1_1 = nn.Conv2d(3, 64, 3, padding=100)
-        self.relu1_1 = nn.ReLU(inplace=True)
-        self.conv1_2 = nn.Conv2d(64, 64, 3, padding=1)
-        self.relu1_2 = nn.ReLU(inplace=True)
-        self.pool1 = nn.MaxPool2d(2, stride=2, ceil_mode=True)  # 1/2
+    def __init__(self, num_classes=21):
+        super().__init__()
+        # stride = 8
+        self.stage1 = nn.Sequential(
+            BasicConv(3, 64, 3, padding=100),
+            BasicConv(64, 64, 3),
+            nn.MaxPool2d(2, stride=2, ceil_mode=True),
+            BasicConv(64, 128, 3),
+            BasicConv(128, 128, 3),
+            nn.MaxPool2d(2, stride=2, ceil_mode=True),
+            BasicConv(128, 256, 3),
+            BasicConv(256, 256, 3),
+            BasicConv(256, 256, 3),
+            nn.MaxPool2d(2, stride=2, ceil_mode=True),
+        )
 
-        # conv2
-        self.conv2_1 = nn.Conv2d(64, 128, 3, padding=1)
-        self.relu2_1 = nn.ReLU(inplace=True)
-        self.conv2_2 = nn.Conv2d(128, 128, 3, padding=1)
-        self.relu2_2 = nn.ReLU(inplace=True)
-        self.pool2 = nn.MaxPool2d(2, stride=2, ceil_mode=True)  # 1/4
+        # stride = 16
+        self.stage2 = nn.Sequential(
+            BasicConv(256, 512, 3),
+            BasicConv(512, 512, 3),
+            BasicConv(512, 512, 3),
+            nn.MaxPool2d(2, stride=2, ceil_mode=True),
+        )
 
-        # conv3
-        self.conv3_1 = nn.Conv2d(128, 256, 3, padding=1)
-        self.relu3_1 = nn.ReLU(inplace=True)
-        self.conv3_2 = nn.Conv2d(256, 256, 3, padding=1)
-        self.relu3_2 = nn.ReLU(inplace=True)
-        self.conv3_3 = nn.Conv2d(256, 256, 3, padding=1)
-        self.relu3_3 = nn.ReLU(inplace=True)
-        self.pool3 = nn.MaxPool2d(2, stride=2, ceil_mode=True)  # 1/8
+        # stride = 32
+        self.stage3 = nn.Sequential(
+            BasicConv(512, 512, 3),
+            BasicConv(512, 512, 3),
+            BasicConv(512, 512, 3),
+            nn.MaxPool2d(2, stride=2, ceil_mode=True),
+        )
 
-        # conv4
-        self.conv4_1 = nn.Conv2d(256, 512, 3, padding=1)
-        self.relu4_1 = nn.ReLU(inplace=True)
-        self.conv4_2 = nn.Conv2d(512, 512, 3, padding=1)
-        self.relu4_2 = nn.ReLU(inplace=True)
-        self.conv4_3 = nn.Conv2d(512, 512, 3, padding=1)
-        self.relu4_3 = nn.ReLU(inplace=True)
-        self.pool4 = nn.MaxPool2d(2, stride=2, ceil_mode=True)  # 1/16
+        self.classifer = nn.Sequential(
+            BasicConv(512, 4096, 7, padding=0),
+            nn.Dropout2d(),
+            BasicConv(4096, 4096, 1, padding=0),
+            nn.Dropout2d(),
+            nn.Conv2d(4096, num_classes, 1, bias=False),
+        )
 
-        # conv5
-        self.conv5_1 = nn.Conv2d(512, 512, 3, padding=1)
-        self.relu5_1 = nn.ReLU(inplace=True)
-        self.conv5_2 = nn.Conv2d(512, 512, 3, padding=1)
-        self.relu5_2 = nn.ReLU(inplace=True)
-        self.conv5_3 = nn.Conv2d(512, 512, 3, padding=1)
-        self.relu5_3 = nn.ReLU(inplace=True)
-        self.pool5 = nn.MaxPool2d(2, stride=2, ceil_mode=True)  # 1/32
+        self.conv3 = BasicConv(256, num_classes, 1, padding=0)
+        self.conv4 = BasicConv(512, num_classes, 1, padding=0)
 
-        # fc6
-        self.fc6 = nn.Conv2d(512, 4096, 7)
-        self.relu6 = nn.ReLU(inplace=True)
-        self.drop6 = nn.Dropout2d()
+        self.upsample3 = nn.ConvTranspose2d(num_classes, num_classes, 16, stride=8, bias=False)
+        self.upsample4 = nn.ConvTranspose2d(num_classes, num_classes, 4, stride=2, bias=False)
+        self.upsample5 = nn.ConvTranspose2d(num_classes, num_classes, 4, stride=2, bias=False)
 
-        # fc7
-        self.fc7 = nn.Conv2d(4096, 4096, 1)
-        self.relu7 = nn.ReLU(inplace=True)
-        self.drop7 = nn.Dropout2d()
+        self._init_weights()
 
-        self.score_fr = nn.Conv2d(4096, n_class, 1)
-        self.score_pool3 = nn.Conv2d(256, n_class, 1)
-        self.score_pool4 = nn.Conv2d(512, n_class, 1)
-
-        self.upscore2 = nn.ConvTranspose2d(
-            n_class, n_class, 4, stride=2, bias=False)
-        self.upscore8 = nn.ConvTranspose2d(
-            n_class, n_class, 16, stride=8, bias=False)
-        self.upscore_pool4 = nn.ConvTranspose2d(
-            n_class, n_class, 4, stride=2, bias=False)
-
-        self._initialize_weights()
-
-    def _initialize_weights(self):
+    def _init_weights(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 m.weight.data.zero_()
@@ -336,66 +248,71 @@ class FCN8s(nn.Module):
                 m.weight.data.copy_(initial_weight)
 
     def forward(self, x):
-        h = x
-        h = self.relu1_1(self.conv1_1(h))
-        h = self.relu1_2(self.conv1_2(h))
-        h = self.pool1(h)
+        _, _, H, W = x.size()
+        x = self.stage1(x)
+        h1 = x
+        x = self.stage2(x)
+        h2 = x
+        x = self.stage3(x)
+        x = self.classifer(x)
 
-        h = self.relu2_1(self.conv2_1(h))
-        h = self.relu2_2(self.conv2_2(h))
-        h = self.pool2(h)
+        # skip-connect: stride = 16
+        x = self.upsample5(x)
+        h3 = x
+        x = self.conv4(h2)
+        x = x[:, :, 5:5 + h3.size(2), 5:5 + h3.size(3)]
+        x = x + h3
 
-        h = self.relu3_1(self.conv3_1(h))
-        h = self.relu3_2(self.conv3_2(h))
-        h = self.relu3_3(self.conv3_3(h))
-        h = self.pool3(h)
-        pool3 = h  # 1/8
+        # skip-connect: stride = 8
+        x = self.upsample4(x)
+        h4 = x
+        x = self.conv3(h1)
+        x = x[:, :, 9:9 + h4.size(2), 9:9 + h4.size(3)]
+        x = x + h4
 
-        h = self.relu4_1(self.conv4_1(h))
-        h = self.relu4_2(self.conv4_2(h))
-        h = self.relu4_3(self.conv4_3(h))
-        h = self.pool4(h)
-        pool4 = h  # 1/16
+        # skip-connect: stride = 1
+        x = self.upsample3(x)
+        x = x[:, :, 31:31 + H, 31:31 + W]
 
-        h = self.relu5_1(self.conv5_1(h))
-        h = self.relu5_2(self.conv5_2(h))
-        h = self.relu5_3(self.conv5_3(h))
-        h = self.pool5(h)
-
-        h = self.relu6(self.fc6(h))
-        h = self.drop6(h)
-
-        h = self.relu7(self.fc7(h))
-        h = self.drop7(h)
-
-        h = self.score_fr(h)
-        h = self.upscore2(h)
-        upscore2 = h  # 1/16
-
-        h = self.score_pool4(pool4)
-        h = h[:, :, 5:5 + upscore2.size()[2], 5:5 + upscore2.size()[3]]
-        score_pool4c = h  # 1/16
-
-        h = upscore2 + score_pool4c  # 1/16
-        h = self.upscore_pool4(h)
-        upscore_pool4 = h  # 1/8
-
-        h = self.score_pool3(pool3)
-        h = h[:, :,
-              9:9 + upscore_pool4.size()[2],
-              9:9 + upscore_pool4.size()[3]]
-        score_pool3c = h  # 1/8
-
-        h = upscore_pool4 + score_pool3c  # 1/8
-
-        h = self.upscore8(h)
-        h = h[:, :, 31:31 + x.size()[2], 31:31 + x.size()[3]].contiguous()
-
-        return h
+        return x
 
 
-x = torch.randn(1, 3, 224, 224)
-net = FCN8s()
-output = net(x)
+if __name__ == '__main__':
+    import matplotlib.pyplot as plt
+    import cv2
+    import numpy as np
 
+    plt.figure()
 
+    rgb = cv2.imread('../../data/Emma.jpg', cv2.IMREAD_COLOR)[:, :, ::-1]
+    rgb = cv2.resize(rgb, (224, 224), interpolation=cv2.INTER_LINEAR)
+    ax = plt.subplot(2, 2, 1)
+    ax.set_title('original')
+    ax.imshow(rgb)
+    image = rgb.astype(np.float)
+    image = image.transpose(2, 0, 1)
+    image /= 255.
+    image = torch.from_numpy(image)
+    image = image.unsqueeze(0).float()
+
+    modes = ['fcn-32s', 'fcn-16s', 'fcn-8s']
+    for i, name in enumerate(modes):
+        if name == 'fcn-32s':
+            net = FCN32s(3)
+        elif name == 'fcn-16s':
+            net = FCN16s(3)
+        elif name == 'fcn-8s':
+            net = FCN8s(3)
+        else:
+            raise NotImplementedError
+        output = net(image)
+
+        output = output.detach().numpy().squeeze(0)
+        output = output.transpose(1, 2, 0)
+        output *= 255.
+        output = output.astype(np.uint8)
+
+        ax = plt.subplot(2, 2, i + 2)
+        ax.set_title(name)
+        ax.imshow(output)
+    plt.show()
