@@ -9,7 +9,7 @@ class SeparableConv2d(nn.Module):
         padding = (kernel_size - 1) * dilation // 2
         self.depth_wise = nn.Conv2d(inplanes, inplanes, kernel_size, stride, padding,
                                     dilation, groups=inplanes, bias=bias)
-        self.relu = nn.BatchNorm2d(inplanes)
+        self.bn = nn.BatchNorm2d(inplanes)
         self.point_wise = nn.Conv2d(inplanes, planes, 1, 1, 0, 1, 1, bias)
 
     def forward(self, x):
@@ -26,9 +26,9 @@ class BasicConv2d(nn.Module):
         self.features = nn.Sequential(
             SeparableConv2d(inplanes, planes, 3, stride=stride, dilation=dilation),
             nn.ReLU(inplace=True),
-            SeparableConv2d(planes, planes, 3, stride=stride, dilation=dilation),
+            SeparableConv2d(planes, planes, 3, stride=1, dilation=dilation),
             nn.ReLU(inplace=True),
-            SeparableConv2d(planes, planes, 3, stride=stride, dilation=dilation)
+            SeparableConv2d(planes, planes, 3, stride=1, dilation=dilation)
         )
 
         self.downsample = None
