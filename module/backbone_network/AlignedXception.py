@@ -4,6 +4,9 @@ import torch.nn as nn
 
 
 class SeparableConv2d(nn.Module):
+    """
+    Depth Separable Convolution.
+    """
     def __init__(self, inplanes, planes, kernel_size=3, stride=1, dilation=1, bias=False):
         super(SeparableConv2d, self).__init__()
         padding = (kernel_size - 1) * dilation // 2
@@ -51,7 +54,16 @@ class BasicConv2d(nn.Module):
 
 
 class AlignedXception(nn.Module):
+    """
+    Ref:
+        Encoder-Decoder with Atrous Separable Convolution for Semantic Image Segmentation.
+    """
     def __init__(self, stride=16):
+        """
+
+        :param stride: Multiples of image down-sampling. The default value is 16(DeepLab v3+) or
+        it can be set to 8(DeepLab v3).
+        """
         super(AlignedXception, self).__init__()
         if stride == 8:
             self.stride = [1, 1]
@@ -114,6 +126,12 @@ class AlignedXception(nn.Module):
                 m.bias.data.zero_()
 
     def forward(self, x):
+        """
+
+        :param x:
+        :return:
+            result: Output two feature map to skip connect.
+        """
         x = self.stem(x)
         x = self.stage1(x)
         low_level_features = x
