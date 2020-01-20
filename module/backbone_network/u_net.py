@@ -124,7 +124,36 @@ class UNet(nn.Module):
         return x
 
 
-inputs = torch.randn(1, 3, 224, 224)
-net = UNet('resnet-152')
-output = net(inputs)
-print(output.size())
+if __name__ == '__main__':
+    import matplotlib.pyplot as plt
+    import cv2
+    import numpy as np
+
+    plt.figure(figsize=(14, 12))
+
+    rgb = cv2.imread('../../data/Emma.jpg', cv2.IMREAD_COLOR)[:, :, ::-1]
+    rgb = cv2.resize(rgb, (320, 320), interpolation=cv2.INTER_LINEAR)
+    ax = plt.subplot(3, 2, 1)
+    ax.set_title('original')
+    ax.imshow(rgb)
+    image = rgb.astype(np.float)
+    image = image.transpose(2, 0, 1)
+    image /= 255.
+    image = torch.from_numpy(image)
+    image = image.unsqueeze(0).float()
+
+    modes = ['resnet-18', 'resnet-34', 'resnet-50', 'resnet-101', 'resnet-152']
+    for i, name in enumerate(modes):
+        net = UNet(name, 3)
+        output = net(image)
+
+        output = output.detach().numpy().squeeze(0)
+        output = output.transpose(1, 2, 0)
+        output *= 255.
+        output = output.astype(np.uint8)
+
+        ax = plt.subplot(3, 2, i + 2)
+        ax.set_title(name)
+        ax.imshow(output)
+    plt.show()
+
