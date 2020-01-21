@@ -4,7 +4,7 @@ import torch.nn as nn
 from general_network.decoder import Decoder
 from backbone_network.AlignedXception import AlignedXception
 from general_network.ASPP import ASPP
-# from resnet import resnet101, resnet18
+from backbone_network.resnet import resnet101
 
 
 def conv3x3(in_channels, out_channels, stride=1, dilation=1):
@@ -44,9 +44,9 @@ class DeepLab(nn.Module):
         if backbone == 'aligned_inception':
             self.backbone = AlignedXception(stride)
             planes = 128
-        # elif backbone == 'resnet':
-        #     self.backbone = resnet101(pretrained=True)
-        #     planes = 256
+        elif backbone == 'resnet':
+            self.backbone = resnet101(pretrained=True)
+            planes = 256
         else:
             raise NotImplementedError
         self.aspp = ASPP(2048, planes=256, stride=16)
@@ -65,10 +65,10 @@ if __name__ == '__main__':
     import cv2
     import numpy as np
 
-    plt.figure(figsize=(14, 12))
+    plt.figure()
 
-    rgb = cv2.imread('../data/Emma.jpg', cv2.IMREAD_COLOR)[:, :, ::-1]
-    rgb = cv2.resize(rgb, (320, 320), interpolation=cv2.INTER_LINEAR)
+    rgb = cv2.imread('../data/Emma2.jpg', cv2.IMREAD_COLOR)[:, :, ::-1]
+    rgb = cv2.resize(rgb, (224, 224), interpolation=cv2.INTER_LINEAR)
     ax = plt.subplot(1, 2, 1)
     ax.set_title('original')
     ax.imshow(rgb)
