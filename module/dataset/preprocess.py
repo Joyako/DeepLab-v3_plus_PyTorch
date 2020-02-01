@@ -1,8 +1,13 @@
+#
+# Ref:https://github.com/jfzhang95/pytorch-deeplab-xception/blob/master/dataloaders/custom_transforms.py
+#
+
 import torch
 import random
 import numpy as np
 
 from PIL import Image, ImageOps, ImageFilter
+import torchvision.transforms.functional as F
 
 
 class Normalize(object):
@@ -140,13 +145,15 @@ class FixScaleCrop(object):
         img = img.crop((x1, y1, x1 + self.crop_size, y1 + self.crop_size))
         mask = mask.crop((x1, y1, x1 + self.crop_size, y1 + self.crop_size))
 
-        return {'image': img,
-                'label': mask}
+        return {'image': img, 'label': mask}
 
 
 class FixedResize(object):
     def __init__(self, size):
-        self.size = (size, size)  # size: (h, w)
+        if isinstance(size, tuple):
+            self.size = size
+        else:
+            self.size = (size, size)  # size: (h, w)
 
     def __call__(self, sample):
         img = sample['image']
@@ -159,3 +166,17 @@ class FixedResize(object):
 
         return {'image': img, 'label': mask}
 
+
+class AdjustColor(object):
+
+    def __call__(self, sample):
+        img = sample['image']
+        mask = sample['label']
+
+        assert img.size == mask.size
+
+        img = F.adjust_brightness(img, 0.3)
+        img = F.adjust_contrast(img, 0.3)
+        img = F.adjust_saturation(img, 0.3)
+
+        return {'image': img, 'label': mask}
