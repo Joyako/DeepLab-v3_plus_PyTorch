@@ -4,7 +4,7 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 import numpy as np
 
-from .preprocess import Normalize, ToTensor, \
+from preprocess import Normalize, ToTensor, \
     RandomHorizontalFlip, RandomGaussianBlur, RandomScaleCrop
 
 
@@ -91,35 +91,69 @@ class BaiDuLaneDataset(Dataset):
     @staticmethod
     def get_file_list(file_path, ext):
         file_list = []
-        dir_path = os.listdir(file_path + '/' + ext)
-        dir_path = sorted(dir_path)
-        for dir in dir_path:
-            dir = os.path.join(ext, dir)
-            camera_file = os.listdir(file_path + '/' + dir)
-            camera_file = sorted(camera_file)
-            for file in camera_file:
-                path = os.path.join(dir, file)
-                for x in sorted(os.listdir(file_path + '/' + path)):
-                    file_list.append(path + '/' + x)
+        if ext == 'ColorImage':
+            dirs = ['Road02/ColorImage_road02', 'Road03/ColorImage_road03',
+                    'Road04/ColorImage_road04']
+        elif ext == 'Label':
+            dirs = ['Gray_Label/Label_road02', 'Gray_Label/Label_road03',
+                    'Gray_Label/Label_road04']
+        else:
+            raise NotImplementedError
+
+        for d in dirs:
+            f_path = os.path.join(file_path, d, ext)
+            dir_path = os.listdir(f_path)
+
+            dir_path = sorted(dir_path)
+            for dir in dir_path:
+                dir = os.path.join(d, ext, dir)
+                camera_file = os.listdir(file_path + '/' + dir)
+                camera_file = sorted(camera_file)
+                for file in camera_file:
+                    path = os.path.join(dir, file)
+                    for x in sorted(os.listdir(file_path + '/' + path)):
+                        file_list.append(path + '/' + x)
 
         return file_list
 
-    def __init__(self, root_file, phase='train', output_size=224, num_classes=9):
+    def __init__(self, root_file, phase='train', output_size=224, num_classes=8):
         super().__init__()
-        self.root_file = os.path.join(root_file, phase)
-        img_ext = 'ColorImage_road04/ColorImage'
-        label_ext = 'Labels_road04/Label'
+        self.root_file = root_file
+        img_ext = 'ColorImage'
+        label_ext = 'Label'
         self.img_list = self.get_file_list(self.root_file, img_ext)
         self.label_list = self.get_file_list(self.root_file, label_ext)
         self.output_size = output_size
         self.transform = self.preprocess(phase)
         self.num_classes = num_classes
 
+        assert len(self.img_list) == len(self.label_list)
+        num_data = len(self.img_list)
+        np.random.seed(0)
+        data_list = np.random.permutation(num_data)
+        self.img_list = np.array(self.img_list)[data_list].tolist()
+        self.label_list = np.array(self.label_list)[data_list].tolist()
+        if phase == 'train':
+            self.img_list = self.img_list[0:int(0.7 * num_data)]
+            self.label_list = self.label_list[0:int(0.7 * num_data)]
+        elif phase == 'val':
+            self.img_list = self.img_list[int(0.7 * num_data):int(0.8 * num_data)]
+            self.label_list = self.label_list[int(0.7 * num_data):int(0.8 * num_data)]
+        elif phase == 'test':
+            self.img_list = self.img_list[int(0.8 * num_data):]
+            self.label_list = self.label_list[int(0.8 * num_data):]
+        else:
+            raise NotImplementedError
+
     def __getitem__(self, item):
         img = cv2.imread(self.root_file + '/' + self.img_list[item], cv2.IMREAD_UNCHANGED)
         target = cv2.imread(self.root_file + '/' + self.label_list[item], cv2.IMREAD_UNCHANGED)
+        offset = 690
+        img = img[offset:, :]
+        target = target[offset:, :]
+        print(self.img_list[item])
+        print(self.label_list[item])
         target = self.encode_label_map(target)
-        # target = self.get_color_map(target)
         img = Image.fromarray(img)
         target = Image.fromarray(target)
         sample = {'image': img, 'label': target}
@@ -130,17 +164,24 @@ class BaiDuLaneDataset(Dataset):
         return sample
 
     def __len__(self):
+        print(len(self.img_list))
         return len(self.img_list)
 
     def encode_label_map(self, mask):
-        h, w = mask.shape
         for value in self.labels.values():
             pixel = value['id']
-            mask[mask == pixel] = value['catId']
+            if value['ignoreInEval']:
+                # 0: category as background
+                mask[mask == pixel] = 0
+            else:
+                trainId = value['trainId']
+                if trainId > 4:
+                    trainId -= 1
+                mask[mask == pixel] = trainId
 
         return mask
 
-    def get_color_map(self, mask):
+    def decode_label_map(self, mask):
         h, w = mask.shape
         new_mask = np.zeros((h, w, 3), dtype=np.uint8)
         for value in self.labels.values():
@@ -153,25 +194,34 @@ class BaiDuLaneDataset(Dataset):
         if phase == 'train':
             preprocess = transforms.Compose([
                 RandomHorizontalFlip(),
-                RandomScaleCrop(base_size=256, crop_size=self.output_size, fill=0),
+                RandomScaleCrop(base_size=1024, crop_size=self.output_size, fill=255),
                 RandomGaussianBlur(),
                 Normalize(mean=(0.485, 0.456, 0.406),
                           std=(0.229, 0.224, 0.225)),
                 ToTensor(),
             ])
+
+        elif phase == 'val':
+            preprocess = transforms.Compose([
+                Normalize(mean=(0.485, 0.456, 0.406),
+                          std=(0.229, 0.224, 0.225)),
+                ToTensor(),
+            ])
+
         elif phase == 'test':
             preprocess = transforms.Compose([
                 Normalize(mean=(0.485, 0.456, 0.406),
                           std=(0.229, 0.224, 0.225)),
                 ToTensor(),
             ])
+
         else:
             raise NotImplementedError
 
         return preprocess
 
-"""
-dataset = BaiDuLaneDataset('/Users/joy/Downloads/dataset')
+
+dataset = BaiDuLaneDataset('/Users/joy/Downloads/dataset/train', 'train', output_size=640)
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 import numpy as np
@@ -182,6 +232,7 @@ for i, sample in enumerate(data_loader):
 
     img, label = sample['image'], sample['label']
     if i == 0:
+        print(label.size())
         img = np.transpose(img[0].numpy(), axes=[1, 2, 0])
         img *= (0.229, 0.224, 0.225)
         img += (0.485, 0.456, 0.406)
@@ -191,7 +242,9 @@ for i, sample in enumerate(data_loader):
         plt.subplot(1, 2, 1)
         plt.imshow(img)
         plt.subplot(1, 2, 2)
-        plt.imshow(label[0].numpy())
+        target = label[0].numpy()
+        print(target.max(), target.min())
+        plt.imshow(target, cmap='gray')
         plt.show()
         break
-"""
+
