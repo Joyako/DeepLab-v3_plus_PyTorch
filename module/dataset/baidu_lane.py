@@ -4,8 +4,8 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 import numpy as np
 
-from preprocess import Normalize, ToTensor, \
-    RandomHorizontalFlip, RandomGaussianBlur, RandomScaleCrop
+from .preprocess import Normalize, ToTensor, \
+    RandomHorizontalFlip, RandomGaussianBlur, RandomScaleCrop, FixedResize, AdjustColor
 
 
 class BaiDuLaneDataset(Dataset):
@@ -92,8 +92,8 @@ class BaiDuLaneDataset(Dataset):
     def get_file_list(file_path, ext):
         file_list = []
         if ext == 'ColorImage':
-            dirs = ['Road02/ColorImage_road02', 'Road03/ColorImage_road03',
-                    'Road04/ColorImage_road04']
+            dirs = ['Image_Data/Road02/ColorImage_road02', 'Image_Data/Road03/ColorImage_road03',
+                    'Image_Data/Road04/ColorImage_road04']
         elif ext == 'Label':
             dirs = ['Gray_Label/Label_road02', 'Gray_Label/Label_road03',
                     'Gray_Label/Label_road04']
@@ -151,8 +151,8 @@ class BaiDuLaneDataset(Dataset):
         offset = 690
         img = img[offset:, :]
         target = target[offset:, :]
-        print(self.img_list[item])
-        print(self.label_list[item])
+        # print(self.img_list[item])
+        # print(self.label_list[item])
         target = self.encode_label_map(target)
         img = Image.fromarray(img)
         target = Image.fromarray(target)
@@ -164,7 +164,7 @@ class BaiDuLaneDataset(Dataset):
         return sample
 
     def __len__(self):
-        print(len(self.img_list))
+        # print(len(self.img_list))
         return len(self.img_list)
 
     def encode_label_map(self, mask):
@@ -194,7 +194,9 @@ class BaiDuLaneDataset(Dataset):
         if phase == 'train':
             preprocess = transforms.Compose([
                 RandomHorizontalFlip(),
-                RandomScaleCrop(base_size=1024, crop_size=self.output_size, fill=255),
+                # RandomScaleCrop(base_size=1024, crop_size=self.output_size, fill=255),
+                FixedResize((768, 256)),
+                # AdjustColor(),
                 RandomGaussianBlur(),
                 Normalize(mean=(0.485, 0.456, 0.406),
                           std=(0.229, 0.224, 0.225)),
@@ -203,6 +205,7 @@ class BaiDuLaneDataset(Dataset):
 
         elif phase == 'val':
             preprocess = transforms.Compose([
+                FixedResize((768, 256)),
                 Normalize(mean=(0.485, 0.456, 0.406),
                           std=(0.229, 0.224, 0.225)),
                 ToTensor(),
@@ -221,6 +224,7 @@ class BaiDuLaneDataset(Dataset):
         return preprocess
 
 
+"""
 dataset = BaiDuLaneDataset('/Users/joy/Downloads/dataset/train', 'train', output_size=640)
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
@@ -247,4 +251,4 @@ for i, sample in enumerate(data_loader):
         plt.imshow(target, cmap='gray')
         plt.show()
         break
-
+"""
