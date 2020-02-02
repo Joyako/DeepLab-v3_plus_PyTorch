@@ -43,9 +43,9 @@ class Metric(object):
         miou = 0.
         for i in range(self.num_classes):
             tp = m[i, i]
-            fn = m[i, 1:].sum()
-            fp = m[1:, i].sum()
-            miou += 1. * tp / (tp + fp + fn)
+            fn = m[i, :].sum() - m[i, i]
+            fp = m[:, i].sum()
+            miou += 1. * tp / (fp + fn)
 
         return  miou / self.num_classes
 
