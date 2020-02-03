@@ -9,8 +9,8 @@ class Metric(object):
         assert preds.shape == target.shape
         # rows -> predict
         # cols -> target
-        preds = preds.astype(np.uint8)
-        target = target.astype(np.uint8)
+        preds = preds.astype(np.int)
+        target = target.astype(np.int)
         m = np.zeros((self.num_classes, self.num_classes), dtype=np.float32)
         N, H, W = target.shape
         for n in range(N):
@@ -40,12 +40,13 @@ class Metric(object):
         if m is None:
             m = self.confusion_matrix(preds, target)
 
-        miou = 0.
-        for i in range(self.num_classes):
-            tp = m[i, i]
-            fn = m[i, :].sum() - m[i, i]
-            fp = m[:, i].sum()
-            miou += 1. * tp / (fp + fn)
+        tp = np.diagonal(m)
+        # fn = fn + tp
+        fn = np.sum(m, 0)
+        # fp = fp + tp
+        fp = np.sum(m, 1)
+        miou = tp / (fn + fp - tp)
+        miou = np.nanmean(miou)
 
-        return  miou / self.num_classes
+        return miou
 
