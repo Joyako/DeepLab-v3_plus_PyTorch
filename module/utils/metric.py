@@ -48,19 +48,22 @@ class Metric(object):
         return miou
 
 
-p = np.array([[2, 0, 1, 0],
-              [2, 1, 1, 0],
-              [0, 1, 1, 0],
-              [1, 1, 0, 1]])
+if __name__ == '__main__':
+    # predict
+    p = np.array([[2, 0, 1, 0],
+                  [2, 1, 1, 0],
+                  [0, 1, 1, 0],
+                  [1, 1, 0, 1]])
 
-t = np.array([[2, 1, 1, 2],
-              [2, 1, 1, 0],
-              [0, 1, 0, 0],
-              [1, 1, 0, 0]])
+    # target
+    t = np.array([[2, 1, 1, 2],
+                  [2, 1, 1, 0],
+                  [0, 1, 0, 0],
+                  [1, 1, 0, 0]])
 
-metric = Metric(3)
-m = metric.confusion_matrix(p, t)
-print(m)
-print('recall : ', metric.recall(p, t, m))
-print('precision : ', metric.precision(p, t, m))
-print('mIoU : ', metric.mIoU(p, t, m))
+    metric = Metric(3)
+    m = metric.confusion_matrix(p, t)
+    print(m)
+    print('recall : ', metric.recall(p, t, m))
+    print('precision : ', metric.precision(p, t, m))
+    print('mIoU : ', metric.mIoU(p, t, m))
