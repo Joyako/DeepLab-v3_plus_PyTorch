@@ -18,6 +18,7 @@ class Metric(object):
 
     def recall(self, preds, target, m=None):
         # rec = tp / (tp + fn)
+        assert preds.shape == target.shape
         if m is None:
             m = self.confusion_matrix(preds, target)
         sum = m.sum(axis=1)
@@ -26,15 +27,23 @@ class Metric(object):
 
     def precision(self, preds, target, m=None):
         # pre = tp / (tp + fp )
+        assert preds.shape == target.shape
         if m is None:
             m = self.confusion_matrix(preds, target)
         sum = m.sum(axis=0)
 
         return m.diagonal() / sum
 
-    def mIoU(self, preds, target, m=None):
+    def add(self, preds, target, m=0.):
+        m += self.confusion_matrix(preds, target)
+
+        return m
+
+    def mIoU(self, preds=None, target=None, m=None):
         # IoU = tp / (tp + fp + fn)
+        assert preds.shape == target.shape
         if m is None:
+            assert (preds is not None and target is not None)
             m = self.confusion_matrix(preds, target)
 
         tp = np.diagonal(m)
