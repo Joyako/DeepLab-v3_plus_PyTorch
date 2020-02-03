@@ -41,7 +41,6 @@ class Metric(object):
 
     def mIoU(self, preds=None, target=None, m=None):
         # IoU = tp / (tp + fp + fn)
-        assert preds.shape == target.shape
         if m is None:
             assert (preds is not None and target is not None)
             m = self.confusion_matrix(preds, target)
