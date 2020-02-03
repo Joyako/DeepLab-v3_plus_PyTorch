@@ -51,7 +51,8 @@ class Metric(object):
         fn = np.sum(m, 1)
         # fp = fp + tp
         fp = np.sum(m, 0)
-        miou = tp / (fn + fp - tp)
+        eps = 1e-5
+        miou = tp / (fn + fp - tp + eps)
         miou = np.nanmean(miou)
 
         return miou
