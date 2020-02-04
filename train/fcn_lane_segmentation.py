@@ -91,6 +91,9 @@ def build_train(cfg, data_loader, val_loader,
         raise NotImplementedError
 
     net.to(device)
+    if cfg['n_gpu'] > 1:
+        net = torch.nn.DataParallel(net, device_ids=[0, 1, 2])
+
     if cfg['pretrain']:
         net.load_state_dict(torch.load(cfg['model_path']))
 
