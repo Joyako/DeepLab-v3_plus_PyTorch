@@ -5,11 +5,15 @@ from torch.optim.lr_scheduler import MultiStepLR
 
 from module.backbone_network.FCN import FCN8s, FCN16s, FCN32s
 from module.utils.metric import Metric
+from module.backbone_network.resnet_unet import ResNet_UNet
+from module.deeplab_v3 import DeepLab
 
 
 def train(net, data_loader, optimizer, criterion, device, epoch, metric, print_freq=40):
     net.train()
     num_data = len(data_loader)
+    max_epoch = 5
+    init_lr = 1e-3
     for i_batch, sample in enumerate(data_loader):
         start_time = time.time()
         img, target = sample['image'], sample['label']
@@ -23,6 +27,10 @@ def train(net, data_loader, optimizer, criterion, device, epoch, metric, print_f
 
         loss.backward()
         optimizer.step()
+
+        if epoch <= max_epoch:
+            adjust_learning_rate_with_warm_up(optimizer, i_batch + (epoch - 1) * num_data,
+                                              max_epoch * num_data, init_lr)
 
         preds = outputs.data.max(1)[1].cpu().numpy()
         mIoU = metric.mIoU(preds=preds, target=target.cpu().numpy())
@@ -60,6 +68,13 @@ def validation(net, data_loader, criterion, device, epoch, metric, print_freq):
         print("mIoU : {}".format(metric.mIoU(m=confusion_matrix)))
 
 
+def adjust_learning_rate_with_warm_up(optimizer, n, num_iter, init_lr):
+    """"""
+    lr = 1e-6 + (init_lr - 1e-6) / num_iter * n
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
+
+
 def build_train(cfg, data_loader, val_loader,
                 criterion, device):
     if cfg['mode'] == 'fcn-8s':
@@ -68,6 +83,10 @@ def build_train(cfg, data_loader, val_loader,
         net = FCN16s(cfg['num_classes'])
     elif cfg['mode'] == 'fcn-32s':
         net = FCN32s(cfg['num_classes'])
+    elif cfg['mode'] == 'U-Net':
+        net = ResNet_UNet('resnet-50', cfg['num_classes'])
+    elif cfg['mode'] == 'DeepLab-v3+':
+        net = DeepLab('aligned_inception', stride=16, num_classes=cfg['num_classes'])
     else:
         raise NotImplementedError
 
