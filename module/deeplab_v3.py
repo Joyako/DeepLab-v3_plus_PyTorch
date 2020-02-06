@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
 
-from general_network.decoder import Decoder
-from backbone_network.AlignedXception import AlignedXception
-from general_network.ASPP import ASPP
-from backbone_network.resnet import resnet101
+from .general_network.decoder import Decoder
+from .backbone_network.AlignedXception import AlignedXception
+from .general_network.ASPP import ASPP
+from .backbone_network.resnet import resnet101
 
 
 def conv3x3(in_channels, out_channels, stride=1, dilation=1):
@@ -33,7 +33,7 @@ class DeepLab(nn.Module):
         Encoder-Decoder with Atrous Separable Convolution for Semantic Image Segmentation.
 
     """
-    def __init__(self, backbone='resnet', stride=16, num_classes=21):
+    def __init__(self, backbone='resnet', stride=16, num_classes=21, pretrained=False):
         """
 
         :param backbone:
@@ -45,7 +45,7 @@ class DeepLab(nn.Module):
             self.backbone = AlignedXception(stride)
             planes = 128
         elif backbone == 'resnet':
-            self.backbone = resnet101(pretrained=True)
+            self.backbone = resnet101(pretrained=pretrained)
             planes = 256
         else:
             raise NotImplementedError
@@ -78,7 +78,7 @@ if __name__ == '__main__':
     image = torch.from_numpy(image)
     image = image.unsqueeze(0).float()
 
-    name = 'aligned_inception'
+    name = 'resnet'
     net = DeepLab(name, stride=16, num_classes=3)
     output = net(image)
 
