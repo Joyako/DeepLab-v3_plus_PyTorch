@@ -9,7 +9,7 @@ from module.backbone_network.resnet_unet import ResNet_UNet
 from module.deeplab_v3 import DeepLab
 
 
-def train(net, data_loader, optimizer, criterion, device, epoch, metric, print_freq=40):
+def train(net, data_loader, val_loader, optimizer, criterion, device, epoch, metric, print_freq=40):
     net.train()
     num_data = len(data_loader)
     max_epoch = 5
@@ -43,6 +43,8 @@ def train(net, data_loader, optimizer, criterion, device, epoch, metric, print_f
                                                         loss.item(), mIoU,
                                                         lr,
                                                         end_time))
+    # validate the net of performance
+    validation(net, val_loader, criterion, device, epoch, metric, print_freq)
 
 
 def validation(net, data_loader, criterion, device, epoch, metric, print_freq):
@@ -90,6 +92,7 @@ def build_train(cfg, data_loader, val_loader,
     else:
         raise NotImplementedError
 
+    torch.backends.cudnn.benchmark = True
     net.to(device)
     if cfg['n_gpu'] > 1:
         net = torch.nn.DataParallel(net, device_ids=[0, 1, 2])
@@ -113,8 +116,7 @@ def build_train(cfg, data_loader, val_loader,
     metric = Metric(cfg['num_classes'])
 
     for epoch in range(1, cfg['epoch'] + 1):
-        train(net, data_loader, optimizer, criterion, device, epoch, metric, cfg['print_freq'])
-        validation(net, val_loader, criterion, device, epoch, metric, cfg['print_freq'])
+        train(net, data_loader, val_loader, optimizer, criterion, device, epoch, metric, cfg['print_freq'])
 
         lr_scheduler.step()
         if epoch > 50 and epoch % 10 == 0:
