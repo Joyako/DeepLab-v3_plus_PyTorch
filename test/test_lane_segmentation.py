@@ -9,14 +9,12 @@ from module.utils.metric import Metric
 
 
 parser = argparse.ArgumentParser(description="Params")
-parser.add_argument('--model-path', type=str, default='/root/private/',
+parser.add_argument('--model-path', type=str, default='/root/private/SemanticSegmentation/weights/',
                     help='The path of model.')
 parser.add_argument('--data-path', type=str, default='/root/private/datasets/lane_segmentation',
                     help='The path of train data')
-parser.add_argument('--batch-size', type=int, default=32, metavar='N',
+parser.add_argument('--batch-size', type=int, default=2, metavar='N',
                     help='input batch size for training (default: 64)')
-parser.add_argument('--num-classes', type=int, default=8, metavar='N',
-                    help='number of classify.')
 args = parser.parse_args()
 
 
@@ -39,11 +37,11 @@ def test(mode, num_classes):
     # Load Model
     net.load_state_dict(torch.load(args.model_path, map_location=lambda storage, loc: storage))
 
-    dataset = BaiDuLaneDataset(args.data_path, 'test', num_classes=args.num_classes)
+    dataset = BaiDuLaneDataset(args.data_path, 'test', num_classes=num_classes)
     data_loader = DataLoader(dataset, batch_size=args.batch_size, num_workers=12)
 
     confusion_matrix = 0.
-    metric = Metric(num_classes=args.num_classes)
+    metric = Metric(num_classes=num_classes)
     with torch.no_grad():
         for i_batch, sample in enumerate(data_loader):
             img, target = sample['image'], sample['label']
@@ -54,12 +52,10 @@ def test(mode, num_classes):
             outputs = F.softmax(outputs)
             preds = outputs.data.max(1)[1].cpu().numpy()
             confusion_matrix = metric.add(preds=preds, target=target.cpu().numpy(), m=confusion_matrix)
+            print(confusion_matrix)
 
         print('Confusion Matrix')
         print(confusion_matrix)
         print("mIoU : {}".format(metric.mIoU(m=confusion_matrix)))
 
-
-if __name__ == "__main__":
-    test()
 
