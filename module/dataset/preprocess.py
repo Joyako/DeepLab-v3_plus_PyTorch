@@ -168,15 +168,20 @@ class FixedResize(object):
 
 
 class AdjustColor(object):
+    def __init__(self, factor=(5, 18)):
+        self.factor = factor
 
     def __call__(self, sample):
         img = sample['image']
         mask = sample['label']
 
         assert img.size == mask.size
+        brightness_factor = random.randint(*self.factor) / 10.
+        contrast_factor = random.randint(*self.factor) / 10.
+        saturation_factor = random.randint(*self.factor) / 10.
 
-        img = F.adjust_brightness(img, 0.3)
-        img = F.adjust_contrast(img, 0.3)
-        img = F.adjust_saturation(img, 0.3)
+        img = F.adjust_brightness(img, brightness_factor)
+        img = F.adjust_contrast(img, contrast_factor)
+        img = F.adjust_saturation(img, saturation_factor)
 
         return {'image': img, 'label': mask}

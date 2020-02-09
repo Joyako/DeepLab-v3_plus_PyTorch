@@ -91,9 +91,8 @@ class BaiDuLaneDataset(Dataset):
     @staticmethod
     def get_file_list(file_path, ext):
         file_list = []
-        if ext == 'ColorImage':
-            dirs = ['Image_Data/Road02/ColorImage_road02', 'Image_Data/Road03/ColorImage_road03',
-                    'Image_Data/Road04/ColorImage_road04']
+        if ext == '':
+            dirs = ['Image_Data/Road02', 'Image_Data/Road03', 'Image_Data/Road04']
         elif ext == 'Label':
             dirs = ['Gray_Label/Label_road02', 'Gray_Label/Label_road03',
                     'Gray_Label/Label_road04']
@@ -116,23 +115,29 @@ class BaiDuLaneDataset(Dataset):
 
         return file_list
 
-    def __init__(self, root_file, phase='train', output_size=224, num_classes=8):
+    def __init__(self, root_file, phase='train', output_size=(224, 224), num_classes=8, adjust_factor=(5, 18)):
         super().__init__()
+        assert phase in ['train', 'val', 'test']
         self.root_file = root_file
-        img_ext = 'ColorImage'
+        img_ext = ''
         label_ext = 'Label'
         self.img_list = self.get_file_list(self.root_file, img_ext)
         self.label_list = self.get_file_list(self.root_file, label_ext)
         self.output_size = output_size
         self.transform = self.preprocess(phase)
         self.num_classes = num_classes
+        self.factor = adjust_factor
 
-        assert len(self.img_list) == len(self.label_list)
         num_data = len(self.img_list)
+        assert num_data == len(self.label_list)
+
+        # Shuffle data.
         np.random.seed(0)
         data_list = np.random.permutation(num_data)
         self.img_list = np.array(self.img_list)[data_list].tolist()
         self.label_list = np.array(self.label_list)[data_list].tolist()
+
+        # Allocate the data set as 7:1:2
         if phase == 'train':
             self.img_list = self.img_list[0:int(0.7 * num_data)]
             self.label_list = self.label_list[0:int(0.7 * num_data)]
@@ -195,8 +200,8 @@ class BaiDuLaneDataset(Dataset):
             preprocess = transforms.Compose([
                 RandomHorizontalFlip(),
                 # RandomScaleCrop(base_size=1024, crop_size=self.output_size, fill=255),
-                FixedResize((768, 256)),
-                # AdjustColor(),
+                FixedResize(self.output_size),
+                AdjustColor(self.factor),
                 RandomGaussianBlur(),
                 Normalize(mean=(0.485, 0.456, 0.406),
                           std=(0.229, 0.224, 0.225)),
@@ -205,7 +210,7 @@ class BaiDuLaneDataset(Dataset):
 
         elif phase == 'val':
             preprocess = transforms.Compose([
-                FixedResize((768, 256)),
+                FixedResize(self.output_size),
                 Normalize(mean=(0.485, 0.456, 0.406),
                           std=(0.229, 0.224, 0.225)),
                 ToTensor(),
@@ -213,6 +218,7 @@ class BaiDuLaneDataset(Dataset):
 
         elif phase == 'test':
             preprocess = transforms.Compose([
+                FixedResize(self.output_size),
                 Normalize(mean=(0.485, 0.456, 0.406),
                           std=(0.229, 0.224, 0.225)),
                 ToTensor(),
@@ -224,31 +230,30 @@ class BaiDuLaneDataset(Dataset):
         return preprocess
 
 
-"""
-dataset = BaiDuLaneDataset('/Users/joy/Downloads/dataset/train', 'train', output_size=640)
-from torch.utils.data import DataLoader
-import matplotlib.pyplot as plt
-import numpy as np
+if __name__ == '__main__':
+    dataset = BaiDuLaneDataset('/Users/joy/Downloads/dataset/train', 'train', output_size=(846, 255))
+    from torch.utils.data import DataLoader
+    import matplotlib.pyplot as plt
 
-data_loader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=0)
+    data_loader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=0)
 
-for i, sample in enumerate(data_loader):
+    for i, sample in enumerate(data_loader):
 
-    img, label = sample['image'], sample['label']
-    if i == 0:
-        print(label.size())
-        img = np.transpose(img[0].numpy(), axes=[1, 2, 0])
-        img *= (0.229, 0.224, 0.225)
-        img += (0.485, 0.456, 0.406)
-        img *= 255.0
-        img = img.astype(np.uint8)
+        img, label = sample['image'], sample['label']
+        if i == 0:
+            # print(label.size())
+            img = np.transpose(img[0].numpy(), axes=[1, 2, 0])
+            img *= (0.229, 0.224, 0.225)
+            img += (0.485, 0.456, 0.406)
+            img *= 255.0
+            img = img.astype(np.uint8)
 
-        plt.subplot(1, 2, 1)
-        plt.imshow(img)
-        plt.subplot(1, 2, 2)
-        target = label[0].numpy()
-        print(target.max(), target.min())
-        plt.imshow(target, cmap='gray')
-        plt.show()
-        break
-"""
+            plt.subplot(1, 2, 1)
+            plt.imshow(img)
+            plt.subplot(1, 2, 2)
+            target = label[0].numpy().astype(np.uint8)
+            print(np.bincount(target.reshape(-1)))
+            plt.imshow(target, cmap='gray')
+            plt.show()
+            break
+
