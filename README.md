@@ -13,6 +13,6 @@ python train.py
 ## Evaluation
 Run:
 ```bash
-python ./test/test_lane_segmentation.py
+python test.py
 ```
 
