@@ -224,9 +224,9 @@ class FCN8s(nn.Module):
 
         self.classifer = nn.Sequential(
             BasicConv(512, 4096, 7, padding=0),
-            nn.Dropout2d(),
+            nn.Dropout2d(0.5),
             BasicConv(4096, 4096, 1, padding=0),
-            nn.Dropout2d(),
+            nn.Dropout2d(0.5),
             nn.Conv2d(4096, num_classes, 1, bias=False),
         )
 
