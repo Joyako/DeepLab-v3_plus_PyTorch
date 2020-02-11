@@ -115,7 +115,7 @@ class BaiDuLaneDataset(Dataset):
 
         return file_list
 
-    def __init__(self, root_file, phase='train', output_size=(224, 224), num_classes=8, adjust_factor=(5, 18)):
+    def __init__(self, root_file, phase='train', output_size=(846, 255), num_classes=8, adjust_factor=(5, 18)):
         super().__init__()
         assert phase in ['train', 'val', 'test']
         self.root_file = root_file
@@ -124,9 +124,9 @@ class BaiDuLaneDataset(Dataset):
         self.img_list = self.get_file_list(self.root_file, img_ext)
         self.label_list = self.get_file_list(self.root_file, label_ext)
         self.output_size = output_size
+        self.factor = adjust_factor
         self.transform = self.preprocess(phase)
         self.num_classes = num_classes
-        self.factor = adjust_factor
 
         num_data = len(self.img_list)
         assert num_data == len(self.label_list)
@@ -171,6 +171,25 @@ class BaiDuLaneDataset(Dataset):
     def __len__(self):
         # print(len(self.img_list))
         return len(self.img_list)
+
+    def data_generator(self, batch_size):
+        index = np.arange(0, len(self.img_list))
+        while len(index):
+            select = np.random.choice(index, batch_size)
+            images = []
+            targets = []
+            for item in select:
+                img = cv2.imread(self.root_file + '/' + self.img_list[item], cv2.IMREAD_UNCHANGED)
+                target = cv2.imread(self.root_file + '/' + self.label_list[item], cv2.IMREAD_UNCHANGED)
+
+                index = np.delete(index, select)
+                sample = {'image': img, 'label': target}
+                if self.transforms is not None:
+                    sample = self.transform(sample)
+                images.append(sample['image'])
+                targets.append(sample['label'])
+
+            yield {'image': images, 'label': targets}
 
     def encode_label_map(self, mask):
         for value in self.labels.values():
@@ -218,7 +237,7 @@ class BaiDuLaneDataset(Dataset):
 
         elif phase == 'test':
             preprocess = transforms.Compose([
-                FixedResize(self.output_size),
+                FixedResize(self.output_size, is_resize=False),
                 Normalize(mean=(0.485, 0.456, 0.406),
                           std=(0.229, 0.224, 0.225)),
                 ToTensor(),
@@ -231,7 +250,8 @@ class BaiDuLaneDataset(Dataset):
 
 
 if __name__ == '__main__':
-    dataset = BaiDuLaneDataset('/Users/joy/Downloads/dataset/train', 'train', output_size=(846, 255))
+    dataset = BaiDuLaneDataset('/Users/joy/Downloads/dataset/train', 'test', output_size=(846, 255),
+                               adjust_factor=(5, 18))
     from torch.utils.data import DataLoader
     import matplotlib.pyplot as plt
 
