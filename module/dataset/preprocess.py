@@ -149,11 +149,12 @@ class FixScaleCrop(object):
 
 
 class FixedResize(object):
-    def __init__(self, size):
+    def __init__(self, size, is_resize=True):
         if isinstance(size, tuple):
             self.size = size
         else:
             self.size = (size, size)  # size: (h, w)
+        self.is_resize = is_resize
 
     def __call__(self, sample):
         img = sample['image']
@@ -162,7 +163,8 @@ class FixedResize(object):
         assert img.size == mask.size
 
         img = img.resize(self.size, Image.BILINEAR)
-        mask = mask.resize(self.size, Image.NEAREST)
+        if self.is_resize:
+            mask = mask.resize(self.size, Image.NEAREST)
 
         return {'image': img, 'label': mask}
 
@@ -185,3 +187,4 @@ class AdjustColor(object):
         img = F.adjust_saturation(img, saturation_factor)
 
         return {'image': img, 'label': mask}
+
