@@ -127,6 +127,7 @@ class BaiDuLaneDataset(Dataset):
         self.factor = adjust_factor
         self.transform = self.preprocess(phase)
         self.num_classes = num_classes
+        self.phase = phase
 
         num_data = len(self.img_list)
         assert num_data == len(self.label_list)
@@ -155,7 +156,8 @@ class BaiDuLaneDataset(Dataset):
         target = cv2.imread(self.root_file + '/' + self.label_list[item], cv2.IMREAD_UNCHANGED)
         offset = 690
         img = img[offset:, :]
-        target = target[offset:, :]
+        if self.phase != 'test':
+            target = target[offset:, :]
         # print(self.img_list[item])
         # print(self.label_list[item])
         target = self.encode_label_map(target)
