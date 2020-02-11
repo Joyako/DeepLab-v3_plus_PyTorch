@@ -59,7 +59,7 @@ def test(mode, num_classes):
             preds = outputs.data.max(1)[1].cpu().numpy()
             target = target.cpu().numpy()
             mask = np.zeros((img.size(0), 690, 3384))
-            target = np.hstack((mask.astype(target.dtype), target))
+            # target = np.hstack((mask.astype(target.dtype), target))
             preds = np.hstack((mask.astype(preds.dtype), preds))
             confusion_matrix = metric.add(preds=preds, target=target, m=confusion_matrix)
             print("mIoU : {}".format(metric.mIoU(m=confusion_matrix)))
@@ -70,15 +70,20 @@ def test(mode, num_classes):
                 img *= 255.0
                 img = img.astype(np.uint8)
 
-                plt.subplot(2, 2, 1)
-                plt.imshow(img)
-                plt.subplot(2, 2, 3)
+                ax = plt.subplot(2, 2, 1)
+                ax.set_title("Color Image")
+                ax.imshow(img)
+
+                ax.subplot(2, 2, 3)
+                ax.set_title("GroundTruth")
                 target = target[0].astype(np.uint8)
-                plt.imshow(target, cmap='gray')
-                plt.subplot(2, 2, 4)
+                ax.imshow(target, cmap='gray')
+
+                ax.subplot(2, 2, 4)
+                ax.set_title("Predict")
                 pred = preds[0].astype(np.uint8)
-                plt.imshow(pred, cmap='gray')
-                plt.show()
+                ax.imshow(pred, cmap='gray')
+                ax.show()
 
         print('Confusion Matrix')
         print(confusion_matrix)
