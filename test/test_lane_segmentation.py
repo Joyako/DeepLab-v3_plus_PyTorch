@@ -74,16 +74,17 @@ def test(mode, num_classes):
                 ax.set_title("Color Image")
                 ax.imshow(img)
 
-                ax.subplot(2, 2, 3)
+                ax = plt.subplot(2, 2, 3)
                 ax.set_title("GroundTruth")
                 target = target[0].astype(np.uint8)
                 ax.imshow(target, cmap='gray')
 
-                ax.subplot(2, 2, 4)
+                ax = plt.subplot(2, 2, 4)
                 ax.set_title("Predict")
                 pred = preds[0].astype(np.uint8)
+                pred = dataset.decode_label_map(pred)
                 ax.imshow(pred, cmap='gray')
-                ax.show()
+                plt.show()
 
         print('Confusion Matrix')
         print(confusion_matrix)

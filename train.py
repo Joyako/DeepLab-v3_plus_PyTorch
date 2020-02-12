@@ -35,8 +35,10 @@ parser.add_argument('--save-path', type=str, default='/root/private/SemanticSegm
 args = parser.parse_args()
 
 criterion = SegmentationLosses(mode='CE || Dice')
-dataset = BaiDuLaneDataset(args.data_path, phase='train', num_classes=args.num_classes, output_size=(846, 255))
-val_dataset = BaiDuLaneDataset(args.data_path, phase='val', num_classes=args.num_classes, output_size=(846, 255))
+dataset = BaiDuLaneDataset(args.data_path, phase='train', num_classes=args.num_classes,
+                           output_size=(846, 255), adjust_factor=(0.4, 1.9))
+val_dataset = BaiDuLaneDataset(args.data_path, phase='val', num_classes=args.num_classes,
+                               output_size=(846, 255))
 
 data_loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=12)
 val_loader = DataLoader(val_dataset, batch_size=args.batch_size, num_workers=12)

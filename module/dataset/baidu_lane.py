@@ -115,7 +115,7 @@ class BaiDuLaneDataset(Dataset):
 
         return file_list
 
-    def __init__(self, root_file, phase='train', output_size=(846, 255), num_classes=8, adjust_factor=(5, 18)):
+    def __init__(self, root_file, phase='train', output_size=(846, 255), num_classes=8, adjust_factor=(0.3, 2.)):
         super().__init__()
         assert phase in ['train', 'val', 'test']
         self.root_file = root_file
@@ -208,13 +208,15 @@ class BaiDuLaneDataset(Dataset):
         return mask
 
     def decode_label_map(self, mask):
-        h, w = mask.shape
-        new_mask = np.zeros((h, w, 3), dtype=np.uint8)
-        for value in self.labels.values():
-            pixel = value['id']
-            new_mask[mask == pixel] = value['color']
+        mask[mask == 1] = 200
+        mask[mask == 2] = 201
+        mask[mask == 3] = 216
+        mask[mask == 4] = 210
+        mask[mask == 5] = 214
+        mask[mask == 6] = 202
+        mask[mask == 7] = 205
 
-        return new_mask
+        return mask
 
     def preprocess(self, phase):
         if phase == 'train':
