@@ -5,7 +5,7 @@ from torchvision import transforms
 import numpy as np
 
 from .preprocess import Normalize, ToTensor, \
-    RandomHorizontalFlip, RandomGaussianBlur, RandomScaleCrop, FixedResize, AdjustColor
+    RandomHorizontalFlip, RandomGaussianBlur, RandomScaleCrop, FixedResize, AdjustColor, CutOut
 
 
 class BaiDuLaneDataset(Dataset):
@@ -115,7 +115,8 @@ class BaiDuLaneDataset(Dataset):
 
         return file_list
 
-    def __init__(self, root_file, phase='train', output_size=(846, 255), num_classes=8, adjust_factor=(0.3, 2.)):
+    def __init__(self, root_file, phase='train', output_size=(846, 255),
+                 num_classes=8, adjust_factor=(0.3, 2.), radius=(0., 1.)):
         super().__init__()
         assert phase in ['train', 'val', 'test']
         self.root_file = root_file
@@ -125,6 +126,7 @@ class BaiDuLaneDataset(Dataset):
         self.label_list = self.get_file_list(self.root_file, label_ext)
         self.output_size = output_size
         self.factor = adjust_factor
+        self.radius = radius
         self.transform = self.preprocess(phase)
         self.num_classes = num_classes
         self.phase = phase
@@ -133,21 +135,21 @@ class BaiDuLaneDataset(Dataset):
         assert num_data == len(self.label_list)
 
         # Shuffle data.
-        np.random.seed(0)
+        np.random.seed(2020)
         data_list = np.random.permutation(num_data)
         self.img_list = np.array(self.img_list)[data_list].tolist()
         self.label_list = np.array(self.label_list)[data_list].tolist()
 
-        # Allocate the data set as 7:1:2
+        # Allocate the data set as 7:2:1
         if phase == 'train':
             self.img_list = self.img_list[0:int(0.7 * num_data)]
             self.label_list = self.label_list[0:int(0.7 * num_data)]
         elif phase == 'val':
-            self.img_list = self.img_list[int(0.7 * num_data):int(0.8 * num_data)]
-            self.label_list = self.label_list[int(0.7 * num_data):int(0.8 * num_data)]
+            self.img_list = self.img_list[int(0.7 * num_data):int(0.9 * num_data)]
+            self.label_list = self.label_list[int(0.7 * num_data):int(0.9 * num_data)]
         elif phase == 'test':
-            self.img_list = self.img_list[int(0.8 * num_data):]
-            self.label_list = self.label_list[int(0.8 * num_data):]
+            self.img_list = self.img_list[int(0.9 * num_data):]
+            self.label_list = self.label_list[int(0.9 * num_data):]
         else:
             raise NotImplementedError
 
@@ -218,14 +220,27 @@ class BaiDuLaneDataset(Dataset):
 
         return mask
 
+    def decode_color_map(self, mask):
+        new_mask = np.zeros((*mask.shape, 3), dtype=np.uint8)
+        new_mask[mask == 0] = [0, 0, 0]
+        new_mask[mask == 1] = [70, 130, 180]
+        new_mask[mask == 2] = [0, 0, 142]
+        new_mask[mask == 3] = [153, 153, 153]
+        new_mask[mask == 4] = [128, 64, 128]
+        new_mask[mask == 5] = [190, 153, 153]
+        new_mask[mask == 6] = [0, 0, 230]
+        new_mask[mask == 7] = [255, 128, 0]
+
+        return new_mask
+
     def preprocess(self, phase):
         if phase == 'train':
             preprocess = transforms.Compose([
-                RandomHorizontalFlip(),
-                # RandomScaleCrop(base_size=1024, crop_size=self.output_size, fill=255),
                 FixedResize(self.output_size),
+                CutOut(64),
+                RandomHorizontalFlip(),
                 AdjustColor(self.factor),
-                RandomGaussianBlur(),
+                RandomGaussianBlur(self.radius),
                 Normalize(mean=(0.485, 0.456, 0.406),
                           std=(0.229, 0.224, 0.225)),
                 ToTensor(),
@@ -254,8 +269,8 @@ class BaiDuLaneDataset(Dataset):
 
 
 if __name__ == '__main__':
-    dataset = BaiDuLaneDataset('/Users/joy/Downloads/dataset/train', 'test', output_size=(846, 255),
-                               adjust_factor=(5, 18))
+    dataset = BaiDuLaneDataset('/Users/joy/Downloads/dataset/train', 'train', output_size=(846, 255),
+                               adjust_factor=(0.5, 1.3), radius=(0., 1.))
     from torch.utils.data import DataLoader
     import matplotlib.pyplot as plt
 
