@@ -3,9 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class ConvBNRelu(nn.Sequential):
+class ConvBNReLU(nn.Sequential):
     def __init__(self, inplanes, planes, kernel_size, padding, dilation):
-        super(ConvBNRelu, self).__init__(
+        super(ConvBNReLU, self).__init__(
             nn.Conv2d(inplanes, planes, kernel_size, stride=1,
                       padding=padding, dilation=dilation, bias=False),
             nn.BatchNorm2d(planes),
@@ -19,7 +19,7 @@ class ASPP(nn.Module):
     Ref:
         Rethinking Atrous Convolution for Semantic Image Segmentation
     """
-    def __init__(self, inplanes, planes, stride=16):
+    def __init__(self, inplanes=2048, planes=256, stride=16):
         super(ASPP, self).__init__()
         if stride == 8:
             dilation = [12, 24, 36]
@@ -28,17 +28,17 @@ class ASPP(nn.Module):
         else:
             raise NotImplementedError
 
-        self.block1 = ConvBNRelu(inplanes, planes, 1, 0, 1)
-        self.block2 = ConvBNRelu(inplanes, planes, 3, dilation[0], dilation[0])
-        self.block3 = ConvBNRelu(inplanes, planes, 3, dilation[1], dilation[1])
-        self.block4 = ConvBNRelu(inplanes, planes, 3, dilation[1], dilation[2])
+        self.block1 = ConvBNReLU(inplanes, planes, 1, 0, 1)
+        self.block2 = ConvBNReLU(inplanes, planes, 3, dilation[0], dilation[0])
+        self.block3 = ConvBNReLU(inplanes, planes, 3, dilation[1], dilation[1])
+        self.block4 = ConvBNReLU(inplanes, planes, 3, dilation[2], dilation[2])
 
         self.block5 = nn.Sequential(
-            nn.AdaptiveAvgPool2d(1),
-            ConvBNRelu(inplanes, planes, 1, 0, 1),
+            nn.AdaptiveAvgPool2d(4),
+            ConvBNReLU(inplanes, planes, 1, 0, 1),
         )
 
-        self.conv = ConvBNRelu(planes * 5, planes, 1, 0, 1)
+        self.conv = ConvBNReLU(planes * 5, planes, 1, 0, 1)
         self.dropout = nn.Dropout(0.5)
 
         self._init_weight()
