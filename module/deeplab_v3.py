@@ -7,6 +7,10 @@ from .general_network.ASPP import ASPP
 from .backbone_network.resnet import resnet101
 
 
+import os
+os.environ['KMP_DUPLICATE_LIB_OK']='True'
+
+
 def conv3x3(in_channels, out_channels, stride=1, dilation=1):
     "3x3 convolution with padding"
 
@@ -53,9 +57,10 @@ class DeepLab(nn.Module):
         self.decoder = Decoder(planes=planes, num_classes=num_classes)
 
     def forward(self, x):
+        # x2 -> low level feature
         x1, x2 = self.backbone(x)
         x1 = self.aspp(x1)
-        x = self.decoder(x1, x2)
+        x = self.decoder(x1, x2, x.size()[2:])
 
         return x
 
@@ -68,8 +73,8 @@ if __name__ == '__main__':
     plt.figure()
 
     rgb = cv2.imread('../data/Emma2.jpg', cv2.IMREAD_COLOR)[:, :, ::-1]
-    rgb = cv2.resize(rgb, (224, 224), interpolation=cv2.INTER_LINEAR)
-    ax = plt.subplot(1, 2, 1)
+    rgb = cv2.resize(rgb, (846, 255), interpolation=cv2.INTER_LINEAR)
+    ax = plt.subplot(2, 2, 1)
     ax.set_title('original')
     ax.imshow(rgb)
     image = rgb.astype(np.float)
@@ -78,17 +83,18 @@ if __name__ == '__main__':
     image = torch.from_numpy(image)
     image = image.unsqueeze(0).float()
 
-    name = 'resnet'
-    net = DeepLab(name, stride=16, num_classes=3)
-    output = net(image)
+    for i, name in enumerate(['resnet', 'aligned_inception']):
+        net = DeepLab(name, stride=16, num_classes=3)
+        output = net(image)
+        print(output.size())
 
-    output = output.detach().numpy().squeeze(0)
-    output = output.transpose(1, 2, 0)
-    output *= 255.
-    output = output.astype(np.uint8)
+        output = output.detach().numpy().squeeze(0)
+        output = output.transpose(1, 2, 0)
+        output *= 255.
+        output = output.astype(np.uint8)
 
-    ax = plt.subplot(1, 2, 2)
-    ax.set_title(name)
-    ax.imshow(output)
+        ax = plt.subplot(2, 2, i + 2)
+        ax.set_title(name)
+        ax.imshow(output)
     plt.show()
 
