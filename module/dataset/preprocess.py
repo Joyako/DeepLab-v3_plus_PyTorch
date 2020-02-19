@@ -76,12 +76,15 @@ class RandomRotate(object):
 
 
 class RandomGaussianBlur(object):
+    def __init__(self, radius=(0., 1.)):
+        self.radius = radius
+
     def __call__(self, sample):
         img = sample['image']
         mask = sample['label']
         if random.random() < 0.5:
             img = img.filter(ImageFilter.GaussianBlur(
-                radius=random.random()))
+                radius=random.uniform(*self.radius)))
 
         return {'image': img, 'label': mask}
 
@@ -160,7 +163,7 @@ class FixedResize(object):
         img = sample['image']
         mask = sample['label']
 
-        assert img.size == mask.size
+        # assert img.size == mask.size
 
         img = img.resize(self.size, Image.BILINEAR)
         if self.is_resize:
@@ -170,7 +173,7 @@ class FixedResize(object):
 
 
 class AdjustColor(object):
-    def __init__(self, factor=(5, 18)):
+    def __init__(self, factor=(0.3, 2.)):
         self.factor = factor
 
     def __call__(self, sample):
@@ -178,13 +181,47 @@ class AdjustColor(object):
         mask = sample['label']
 
         assert img.size == mask.size
-        brightness_factor = random.randint(*self.factor) / 10.
-        contrast_factor = random.randint(*self.factor) / 10.
-        saturation_factor = random.randint(*self.factor) / 10.
+        brightness_factor = random.uniform(*self.factor)
+        contrast_factor = random.uniform(*self.factor)
+        saturation_factor = random.uniform(*self.factor)
 
         img = F.adjust_brightness(img, brightness_factor)
         img = F.adjust_contrast(img, contrast_factor)
         img = F.adjust_saturation(img, saturation_factor)
 
         return {'image': img, 'label': mask}
+
+
+class CutOut(object):
+    def __init__(self, mask_size):
+        self.mask_size = mask_size
+
+    def __call__(self, sample):
+        img = sample['image']
+        mask = sample['label']
+        image = np.array(img)
+        mask = np.array(mask)
+
+        mask_size_half = self.mask_size // 2
+        offset = 1 if self.mask_size % 2 == 0 else 0
+
+        h, w = image.shape[:2]
+
+        # find mask center coordinate
+        cxmin, cxmax = mask_size_half, w + offset - mask_size_half
+        cymin, cymax = mask_size_half, h + offset - mask_size_half
+
+        cx = random.randint(cxmin, cxmax)
+        cy = random.randint(cymin, cymax)
+
+        # left-top point
+        xmin, ymin = cx - mask_size_half, cy - mask_size_half
+        # right-bottom point
+        xmax, ymax = xmin + self.mask_size, ymin + self.mask_size
+
+        xmin, ymin, xmax, ymax = max(0, xmin), max(0, ymin), min(w, xmax), min(h, ymax)
+
+        if random.uniform(0, 1) < 0.5:
+            image[ymin:ymax, xmin:xmax] = (0, 0, 0)
+        return {'image': Image.fromarray(image), 'label': Image.fromarray(mask)}
 
