@@ -12,12 +12,12 @@ class SeparableConv2d(nn.Module):
         padding = (kernel_size - 1) * dilation // 2
         self.depth_wise = nn.Conv2d(inplanes, inplanes, kernel_size, stride, padding,
                                     dilation, groups=inplanes, bias=bias)
-        self.bn = nn.BatchNorm2d(inplanes)
+        # self.bn = nn.BatchNorm2d(inplanes)
         self.point_wise = nn.Conv2d(inplanes, planes, 1, 1, 0, 1, 1, bias)
 
     def forward(self, x):
         x = self.depth_wise(x)
-        x = self.bn(x)
+        # x = self.bn(x)
         x = self.point_wise(x)
 
         return x
