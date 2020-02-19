@@ -116,6 +116,18 @@ class UNet(nn.Module):
         self.decoder = Decoder(self.in_channel, self.out_channel)
         self.out = nn.Conv2d(64, num_classes, 1)
 
+        self._init_weight()
+
+    def _init_weight(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+
     def forward(self, x):
         x = self.encoder(x)
         x = self.decoder(x)
