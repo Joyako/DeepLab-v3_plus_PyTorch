@@ -19,3 +19,6 @@ Run:
 python test.py
 ```
 
+## Show
+![Test image](https://github.com/Joyako/Lane_Segmentation/blob/master/data/test2.jpg)
+
