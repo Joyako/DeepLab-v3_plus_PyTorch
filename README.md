@@ -2,7 +2,7 @@
 FCN, DeepLab V3+, U-Net for lane segmentation in PyTorch.
 
 ## News
-<li>[2/10/2020]
+<li>[3/15/2020] Implemented Deformable Convolution.
 
 ## Dataset & Training
 To train the network, one can use [competition data set](https://aistudio.baidu.com/aistudio/competition/detail/5).
