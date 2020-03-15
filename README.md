@@ -1,6 +1,9 @@
 # Lane_Segmentation
 FCN, DeepLab V3+, U-Net for lane segmentation in PyTorch.
 
+## News
+<li>[2/10/2020]
+
 ## Dataset & Training
 To train the network, one can use [competition data set](https://aistudio.baidu.com/aistudio/competition/detail/5).
 Firstly, Downloading it. The Dataset with 21914 images, the number of training, validation and test sets is 15339,2192,4383 respectively. 
