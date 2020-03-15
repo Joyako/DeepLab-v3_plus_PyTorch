@@ -34,6 +34,7 @@ parser.add_argument('--save-path', type=str, default='./weights/',
                     help='Model path.')
 args = parser.parse_args()
 
+
 weights = torch.FloatTensor([0.00289, 0.2411, 1.068, 2.547, 7.544, 0.2689, 0.9043, 1.572])
 criterion = SegmentationLosses(mode='CE', weights=weights)
 dataset = BaiDuLaneDataset(args.data_path, phase='train', num_classes=args.num_classes,
