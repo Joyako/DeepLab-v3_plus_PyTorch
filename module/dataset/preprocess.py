@@ -5,6 +5,7 @@
 import torch
 import random
 import numpy as np
+import cv2
 
 from PIL import Image, ImageOps, ImageFilter
 import torchvision.transforms.functional as F
@@ -54,7 +55,7 @@ class RandomHorizontalFlip(object):
     def __call__(self, sample):
         img = sample['image']
         mask = sample['label']
-        if random.random() < 0.5:
+        if np.random.random() < 0.5:
             img = img.transpose(Image.FLIP_LEFT_RIGHT)
             mask = mask.transpose(Image.FLIP_LEFT_RIGHT)
 
@@ -82,7 +83,7 @@ class RandomGaussianBlur(object):
     def __call__(self, sample):
         img = sample['image']
         mask = sample['label']
-        if random.random() < 0.5:
+        if np.random.random() < 0.5:
             img = img.filter(ImageFilter.GaussianBlur(
                 radius=random.uniform(*self.radius)))
 
@@ -181,9 +182,9 @@ class AdjustColor(object):
         mask = sample['label']
 
         assert img.size == mask.size
-        brightness_factor = random.uniform(*self.factor)
-        contrast_factor = random.uniform(*self.factor)
-        saturation_factor = random.uniform(*self.factor)
+        brightness_factor = np.random.uniform(*self.factor)
+        contrast_factor = np.random.uniform(*self.factor)
+        saturation_factor = np.random.uniform(*self.factor)
 
         img = F.adjust_brightness(img, brightness_factor)
         img = F.adjust_contrast(img, contrast_factor)
@@ -211,8 +212,8 @@ class CutOut(object):
         cxmin, cxmax = mask_size_half, w + offset - mask_size_half
         cymin, cymax = mask_size_half, h + offset - mask_size_half
 
-        cx = random.randint(cxmin, cxmax)
-        cy = random.randint(cymin, cymax)
+        cx = np.random.randint(cxmin, cxmax)
+        cy = np.random.randint(cymin, cymax)
 
         # left-top point
         xmin, ymin = cx - mask_size_half, cy - mask_size_half
@@ -224,4 +225,62 @@ class CutOut(object):
         if random.uniform(0, 1) < 0.5:
             image[ymin:ymax, xmin:xmax] = (0, 0, 0)
         return {'image': Image.fromarray(image), 'label': Image.fromarray(mask)}
+
+
+class RandomScale(object):
+    def __call__(self, sample):
+        image = sample['image']
+        mask = sample['label']
+        image = np.array(image)
+        mask = np.array(mask)
+
+        scale = np.random.uniform(0.7, 1.5)
+        h, w = image.shape[:2]
+        aug_image = image.copy()
+        aug_mask = mask.copy()
+
+        aug_image = cv2.resize(aug_image, (int(scale * w), int(scale * h)))
+        aug_mask = cv2.resize(aug_mask, (int(scale * w), int(scale * h)))
+
+        if scale < 1.:
+            new_h, new_w, _ = aug_image.shape
+            pre_h_pad = int((h - new_h) / 2)
+            pre_w_pad = int((w - new_w) / 2)
+            pad_list = [[pre_h_pad, h - new_h - pre_h_pad], [pre_w_pad, w - new_w - pre_w_pad], [0, 0]]
+            aug_image = np.pad(aug_image, pad_list, mode="constant", constant_values=0)
+            aug_mask = np.pad(aug_mask, pad_list[:2], mode="constant", constant_values=255)
+
+        if scale >= 1.:
+            new_h, new_w = aug_image.shape[:2]
+            pre_h_crop = int((new_h - h) / 2)
+            pre_w_crop = int((new_w - w) / 2)
+            post_h_crop = h + pre_h_crop
+            post_w_crop = w + pre_w_crop
+            aug_image = aug_image[pre_h_crop:post_h_crop, pre_w_crop:post_w_crop]
+            aug_mask = aug_mask[pre_h_crop:post_h_crop, pre_w_crop:post_w_crop]
+
+        return {'image': Image.fromarray(aug_image), 'label': Image.fromarray(aug_mask)}
+
+
+class Translate(object):
+    def __init__(self, t=50, ingore_index=255):
+        self.t = t
+        self.ingore_index = ingore_index
+
+    def __call__(self, sample):
+        image = sample['image']
+        target = sample['label']
+        image = np.array(image)
+        target = np.array(target)
+
+        if np.random.random() > 0.5:
+            x = random.uniform(-self.t, self.t)
+            y = random.uniform(-self.t, self.t)
+            M = np.float32([[1, 0, x],
+                            [0, 1, y]])
+            h, w = image.shape[:2]
+            image = cv2.warpAffine(image, M, (w, h), flags=cv2.INTER_LINEAR, borderValue=(0, 0, 0))
+            target = cv2.warpAffine(target, M, (w, h), flags=cv2.INTER_NEAREST, borderValue=(self.ingore_index, ))
+
+        return {'image': Image.fromarray(image), 'label': Image.fromarray(target)}
 

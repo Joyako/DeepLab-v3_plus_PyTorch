@@ -4,8 +4,9 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 import numpy as np
 
-from .preprocess import Normalize, ToTensor, \
-    RandomHorizontalFlip, RandomGaussianBlur, RandomScaleCrop, FixedResize, AdjustColor, CutOut
+from preprocess import Normalize, ToTensor, \
+    RandomHorizontalFlip, RandomGaussianBlur, RandomScaleCrop, \
+    FixedResize, AdjustColor, CutOut, RandomScale, Translate
 
 
 class BaiDuLaneDataset(Dataset):
@@ -156,6 +157,9 @@ class BaiDuLaneDataset(Dataset):
     def __getitem__(self, item):
         img = cv2.imread(self.root_file + '/' + self.img_list[item], cv2.IMREAD_UNCHANGED)
         target = cv2.imread(self.root_file + '/' + self.label_list[item], cv2.IMREAD_UNCHANGED)
+        assert os.path.basename(self.img_list[item]).replace('.jpg', '') == \
+               os.path.basename(self.label_list[item]).replace('_bin.png', '')
+
         offset = 690
         img = img[offset:, :]
         if self.phase != 'test':
@@ -237,6 +241,8 @@ class BaiDuLaneDataset(Dataset):
         if phase == 'train':
             preprocess = transforms.Compose([
                 FixedResize(self.output_size),
+                Translate(50, 255),
+                # RandomScale(),
                 CutOut(64),
                 RandomHorizontalFlip(),
                 AdjustColor(self.factor),
@@ -276,10 +282,23 @@ if __name__ == '__main__':
 
     data_loader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=0)
 
+    count = np.ones((8, ), dtype=np.int)
     for i, sample in enumerate(data_loader):
 
         img, label = sample['image'], sample['label']
+
         if i == 0:
+            target = label[0].numpy().astype(np.uint8)
+            cnt = np.bincount(target.reshape(-1))
+
+            # for j in range(len(cnt)):
+            #     count[j] += cnt[j]
+            # print(count)
+    # count = count.astype(np.float32) / 500.
+    # print(count)
+    # count = np.median(count) / count
+    # print(count)
+
             # print(label.size())
             img = np.transpose(img[0].numpy(), axes=[1, 2, 0])
             img *= (0.229, 0.224, 0.225)
