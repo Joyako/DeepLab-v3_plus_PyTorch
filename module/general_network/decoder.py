@@ -19,7 +19,7 @@ class Decoder(nn.Module):
         )
 
         self.conv2 = nn.Sequential(
-            nn.Conv2d(planes + 256, 256, 3, bias=False),
+            nn.Conv2d(planes + 256, 256, 3, padding=1, bias=False),
             nn.BatchNorm2d(256),
             nn.ReLU(inplace=True),
             nn.Dropout(0.5),
@@ -40,13 +40,18 @@ class Decoder(nn.Module):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
 
-    def forward(self, x1, x2):
+    def forward(self, x1, x2, output_size):
+        """
+
+        :param x1:
+        :param x2: low level feature
+        :return:
+        """
         out1 = self.conv1(x2)
-        h, w = x1.size()[2:]
-        out0 = F.interpolate(x1, size=(h * 4, w * 4), mode='bilinear', align_corners=True)
+        out0 = F.interpolate(x1, size=x2.size()[2:], mode='bilinear', align_corners=True)
         out = torch.cat((out0, out1), dim=1)
         out = self.conv2(out)
-        out = F.interpolate(out, size=(h * 16, w * 16), mode='bilinear', align_corners=True)
+        out = F.interpolate(out, size=output_size, mode='bilinear', align_corners=True)
 
         return out
 

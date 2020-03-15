@@ -1,10 +1,11 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
 
 
 class SegmentationLosses(nn.Module):
-    def __init__(self, mode='CE', weights=None,
+    def __init__(self, num_classes=8, mode='CE', weights=None,
                  ignore_index=255, gamma=2, alpha=0.5, reduction='mean'):
         super().__init__()
         self.gamma = gamma
@@ -13,6 +14,7 @@ class SegmentationLosses(nn.Module):
         self.weights = weights
         self.ignore_index = ignore_index
         self.reduction = reduction
+        self.num_classes = num_classes
 
     def forward(self, preds, target):
         """"""
@@ -42,10 +44,23 @@ class SegmentationLosses(nn.Module):
         :param target: Tensor of shape [N, H, W]
         :return:
         """
+        device = target.device
         # if self.weights is not None:
-        #     self.weights =
-        return F.cross_entropy(preds, target, weight=self.weights,
-                               ignore_index=self.ignore_index)
+        #     weight = self.weights.to(device)
+        # else:
+        #     arr = target.data.cpu().numpy().reshape(-1)
+        #     weight = np.bincount(arr)
+        #     weight = weight.astype(np.float)
+        #     # weight = weight.sum() / weight
+        #     weight = weight / weight.sum()
+        #     median = np.median(weight)
+        #     for i in range(weight.shape[0]):
+        #         if int(weight[i]) == 0:
+        #             continue
+        #         weight[i] = median / weight[i]
+        #     weight = torch.from_numpy(weight).to(device).float()
+
+        return F.cross_entropy(preds, target, weight=self.weights.to(device), ignore_index=self.ignore_index)
 
     def FocalLoss(self, preds, target):
         """
@@ -132,7 +147,7 @@ class SegmentationLosses(nn.Module):
 
 
 if __name__ == '__main__':
-    criteria = SegmentationLosses(mode='CE || Dice')
+    criteria = SegmentationLosses(mode='CE')
     #  logits = torch.randn(16, 19, 14, 14)
     im = torch.randn(16, 3, 14, 14)
     label = torch.randint(0, 19, (16, 14, 14)).long()

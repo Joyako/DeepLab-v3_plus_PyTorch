@@ -9,11 +9,11 @@ from module.backbone_network.resnet_unet import ResNet_UNet
 from module.deeplab_v3 import DeepLab
 
 
-def train(net, data_loader, optimizer, criterion, device, epoch, metric, print_freq=40):
+def train(cfg, net, data_loader, optimizer, criterion, device, epoch, metric):
     net.train()
     num_data = len(data_loader)
-    max_epoch = 5
-    init_lr = 1e-3
+    warm_up_epoch = cfg['warm_up_epoch']
+    init_lr = cfg['lr']
     confusion_matrix = 0.
     for i_batch, sample in enumerate(data_loader):
         start_time = time.time()
@@ -22,6 +22,11 @@ def train(net, data_loader, optimizer, criterion, device, epoch, metric, print_f
         target = target.to(device)
 
         optimizer.zero_grad()
+
+        if epoch <= warm_up_epoch:
+            adjust_learning_rate_with_warm_up(optimizer, i_batch + (epoch - 1) * num_data,
+                                              warm_up_epoch * num_data, init_lr)
+
         outputs = net(img)
 
         loss = criterion(outputs, target.long())
@@ -29,15 +34,14 @@ def train(net, data_loader, optimizer, criterion, device, epoch, metric, print_f
         loss.backward()
         optimizer.step()
 
-        if epoch <= max_epoch:
-            adjust_learning_rate_with_warm_up(optimizer, i_batch + (epoch - 1) * num_data,
-                                              max_epoch * num_data, init_lr)
+        if not cfg['auto_adjust_lr']:
+            adjust_learning(optimizer, epoch)
 
         preds = outputs.data.max(1)[1].cpu().numpy()
         confusion_matrix = metric.add(preds=preds, target=target.cpu().numpy(), m=confusion_matrix)
         end_time = time.time() - start_time
         lr = optimizer.param_groups[0]['lr']
-        if i_batch % print_freq == 0:
+        if i_batch % cfg['print_freq'] == 0:
             print("Train/Epoch: {} Iter: {}/{} Loss: {:.4f} "
                   "LR: {:.8f} BatchTime: {:.4f}".format(epoch,
                                                         i_batch, num_data,
@@ -78,6 +82,22 @@ def adjust_learning_rate_with_warm_up(optimizer, n, num_iter, init_lr):
         param_group['lr'] = lr
 
 
+def adjust_learning(optimizer, epoch):
+    """Adjust Learning"""
+    if epoch <= 5:
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = 5e-3
+    elif epoch <= 10:
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = 1e-4
+    elif epoch <= 15:
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = 5e-5
+    else:
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = 1e-5
+
+
 def build_train(cfg, data_loader, val_loader,
                 criterion, device):
     if cfg['mode'] == 'fcn-8s':
@@ -113,13 +133,15 @@ def build_train(cfg, data_loader, val_loader,
     else:
         raise NotImplementedError
 
-    lr_scheduler = MultiStepLR(optimizer, milestones=cfg['milestones'], gamma=0.1)
+    if cfg['auto_adjust_lr']:
+        lr_scheduler = MultiStepLR(optimizer, milestones=cfg['milestones'], gamma=0.1)
     metric = Metric(cfg['num_classes'])
 
     for epoch in range(1, cfg['epoch'] + 1):
-        train(net, data_loader, optimizer, criterion, device, epoch, metric, cfg['print_freq'])
+        train(cfg, net, data_loader, optimizer, criterion, device, epoch, metric)
         # validate the net of performance
         validation(net, val_loader, criterion, device, epoch, metric, cfg['print_freq'])
 
-        lr_scheduler.step()
+        if cfg['auto_adjust_lr']:
+            lr_scheduler.step()
         torch.save(net.state_dict(), cfg['save_path'] + '/Lane_%s.pth' % epoch)

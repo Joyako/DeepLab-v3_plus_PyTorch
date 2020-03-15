@@ -8,11 +8,11 @@ from module.dataset.baidu_lane import BaiDuLaneDataset
 
 
 parser = argparse.ArgumentParser(description='SemanticSegmentation')
-parser.add_argument('--data-path', type=str, default='/Users/joy/Downloads/dataset/train',
+parser.add_argument('--data-path', type=str, default='/root/data/LaneSeg',
                     help='The path of train data')
 parser.add_argument('--batch-size', type=int, default=2, metavar='N',
                     help='input batch size for training (default: 64)')
-parser.add_argument('--print-freq', type=int, default=1, metavar='N',
+parser.add_argument('--print-freq', type=int, default=40, metavar='N',
                     help='how many batches to wait before logging training status')
 parser.add_argument('--lr', type=float, default=1e-3, metavar='LR',
                     help='learning rate (default: 1e-3)')
@@ -28,31 +28,33 @@ parser.add_argument('--num-classes', type=int, default=8, metavar='N',
                     help='number of classify.')
 parser.add_argument('--pretrain', type=bool, default=False,
                     help='Loading pretrain model.')
-parser.add_argument('--model-path', type=str, default='/root/private/SemanticSegmentation/weights/',
+parser.add_argument('--model-path', type=str, default='./weights/DeepLab_40.pth',
                     help='Model path.')
-parser.add_argument('--save-path', type=str, default='/root/private/SemanticSegmentation/weights/',
+parser.add_argument('--save-path', type=str, default='./weights/',
                     help='Model path.')
 args = parser.parse_args()
 
-criterion = SegmentationLosses(mode='CE || Dice')
+criterion = SegmentationLosses(mode='CE')
 dataset = BaiDuLaneDataset(args.data_path, phase='train', num_classes=args.num_classes,
-                           output_size=(846, 255), adjust_factor=(0.4, 1.9))
+                           output_size=(846, 255), adjust_factor=(0., 1.), radius=(0., 1.))
 val_dataset = BaiDuLaneDataset(args.data_path, phase='val', num_classes=args.num_classes,
                                output_size=(846, 255))
 
 data_loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=12)
 val_loader = DataLoader(val_dataset, batch_size=args.batch_size, num_workers=12)
 
-device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda:7' if torch.cuda.is_available() else 'cpu')
 num = len(dataset)
 
 if __name__ == '__main__':
     cfg = {
-        'mode': 'fcn-8s',
+        'mode': 'DeepLab-v3+',
         'n_gpu': 1,
         'num_classes': args.num_classes,
         'optim': 'Adam',
-        'milestones': [10, 15],
+        'auto_adjust_lr': True,
+        'warm_up_epoch': 0,
+        'milestones': [10, 18],
         'weight_decay': args.weight_decay,
         'print_freq': args.print_freq,
         'lr': args.lr,

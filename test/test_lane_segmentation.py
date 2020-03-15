@@ -53,7 +53,7 @@ def test(mode, num_classes):
             target = target.to(device)
 
             outputs = net(img)
-            outputs = F.softmax(outputs)
+            # outputs = F.softmax(outputs)
             # bilinear
             outputs = F.interpolate(outputs, size=(1020, 3384), mode='bilinear', align_corners=True)
             preds = outputs.data.max(1)[1].cpu().numpy()
@@ -77,13 +77,14 @@ def test(mode, num_classes):
                 ax = plt.subplot(2, 2, 3)
                 ax.set_title("GroundTruth")
                 target = target[0].astype(np.uint8)
-                ax.imshow(target, cmap='gray')
+                target = dataset.decode_color_map(target)
+                ax.imshow(target)
 
                 ax = plt.subplot(2, 2, 4)
                 ax.set_title("Predict")
                 pred = preds[0].astype(np.uint8)
-                pred = dataset.decode_label_map(pred)
-                ax.imshow(pred, cmap='gray')
+                pred = dataset.decode_color_map(pred)
+                ax.imshow(pred)
                 plt.show()
 
         print('Confusion Matrix')
